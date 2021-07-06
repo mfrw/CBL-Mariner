@@ -38,6 +38,10 @@ func Contains(s []*pkggraph.PkgNode, e *pkggraph.PkgNode) bool {
     return false
 }
 
+func DetectCycle(u *pkggraph.PkgNode, v *pkggraph.PkgNode, g pkggraph.PkgGraph, leader map[*pkggraph.PkgNode]*pkggraph.PkgNode){
+	
+}
+
 func Clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
 	top:=CompTopLevels(g)
 	V:= g.AllNodes()
