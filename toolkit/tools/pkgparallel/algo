@@ -19,5 +19,5 @@ for u ∈ V following the traversal order in input do
             if markdown[v] then continue
             if DetectCycle(u, v, G, leader) then continue
             leader[u] ← leader[v]
-            markdown[u] ← markdup[v] ← true
+            markdown[u] ← markup[v] ← true
 return leader

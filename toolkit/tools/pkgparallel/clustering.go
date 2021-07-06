@@ -13,8 +13,21 @@ import (
 	"pkggraph"
 )
 
-func CompTopLevels(g *pkggraph.PkgGraph) []*pkggraph.PkgNode{
-	
+func CompTopLevels(g *pkggraph.PkgGraph) map[*pkggraph.PkgNode]int{
+	top:= make(map[*pkggraph.PkgNode]int)
+	V:= g.AllNodes()
+	source:= make(*pkggraph.PkgNode)
+	for _, u := range V{
+		if (Union(simple.directedGraph.From(u.ID()), simple.directedGraph.To(u.ID())) == V){
+			source = u
+			break
+		}
+	}
+	for _,u := range V{
+		path, dist := graph.ShortestPath(g,source.ID(),u.ID())
+		top[u]=dist
+	}
+	return top
 }
 func Contains(s []*pkggraph.PkgNode, e *pkggraph.PkgNode) bool {
     for _, a := range s {
@@ -39,11 +52,11 @@ func Clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
 	for _, u := range V{
 		if (markup[u]&&markdown[u])
 			continue
-		for _,v := range Union(simple.directedGraph.From(u), simple.directedGraph.To(u)){
+		for _,v := range Union(simple.directedGraph.From(u.ID()), simple.directedGraph.To(u.ID())){
 			if (absolute(top[u]-top[v])>1){
 				continue
 			}
-			if (contains(simple.directedGraph.From(u),v)){
+			if (Contains(simple.directedGraph.From(u.ID()),v)){
 				if (markup[v])
 					continue
 				if (DetectCycle(u, v, g, leader))
@@ -51,7 +64,7 @@ func Clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
 				leader[u]=leader[v]
 				markup[u]=markdown[v]=true
 			}
-			if (contains(simple.directedGraph.To(u),v)){
+			if (Contains(simple.directedGraph.To(u.ID()),v)){
 				if (markdown[v])
 					continue
 				if (DetectCycle(u, v, g, leader))
