@@ -16,7 +16,7 @@ import (
 func CompTopLevels(g *pkggraph.PkgGraph) []*pkggraph.PkgNode{
 	
 }
-func contains(s []*pkggraph.PkgNode, e *pkggraph.PkgNode) bool {
+func Contains(s []*pkggraph.PkgNode, e *pkggraph.PkgNode) bool {
     for _, a := range s {
         if a == e {
             return true
@@ -25,7 +25,7 @@ func contains(s []*pkggraph.PkgNode, e *pkggraph.PkgNode) bool {
     return false
 }
 
-func clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
+func Clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
 	top:=CompTopLevels(g)
 	V:= g.AllNodes()
 	markup:= make(map[*pkggraph.PkgNode]bool)
