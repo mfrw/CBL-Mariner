@@ -1,4 +1,4 @@
-package main
+package clusterise
 
 import (
 	"fmt"
@@ -88,7 +88,7 @@ func DetectCycle(u *pkggraph.PkgNode, v *pkggraph.PkgNode, g pkggraph.PkgGraph, 
 	return false;
 }
 
-func Clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
+func clusterise(g *pkggraph.PkgGraph) map[*pkggraph.PkgNode]*pkggraph.PkgNode {
 	top:=CompTopLevels(g)
 	V:= g.AllNodes()
 	markup:= make(map[*pkggraph.PkgNode]bool)
@@ -131,8 +131,4 @@ func Clusterise(g *pkggraph.PkgGraph, n pkggraph.PkgNode) []*pkggraph.PkgGraph {
 		}
 	}
 	return leader
-}
-
-func main() {
-	
 }

@@ -13,6 +13,8 @@ import (
 	"microsoft.com/pkggen/internal/logger"
 	"microsoft.com/pkggen/internal/pkggraph"
 	"microsoft.com/pkggen/unravel/formats"
+
+	"clusterise"
 )
 
 const (
@@ -47,6 +49,8 @@ func main() {
 	g := pkggraph.NewPkgGraph()
 	err := pkggraph.ReadDOTGraphFile(g, *input)
 	logger.PanicOnError(err, "Failed to read graph file file '%s'.", *input)
+
+	leader := clustering.clusterise(g)
 
 	var u formats.Unravel
 	switch *format {
