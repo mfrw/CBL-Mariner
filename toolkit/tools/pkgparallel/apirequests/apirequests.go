@@ -1,4 +1,4 @@
-package APIRequests
+package apirequests
 
 import (
     "encoding/json"
