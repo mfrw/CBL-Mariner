@@ -4,16 +4,19 @@ import (
 	"math"
 	"reflect"
 	"gonum.org/v1/gonum/graph"
-	"gonum.org/v1/gonum/graph/path"
+	// "gonum.org/v1/gonum/graph/simple"
+	// "gonum.org/v1/gonum/graph/path"
 	"microsoft.com/pkggen/internal/pkggraph"
 )
 
 func ShortestPath(g *pkggraph.PkgGraph,u graph.Node,v graph.Node) int64 {
-	if (!g.HasEdgeFromTo(u.ID(),v.ID())){
-		return 0
-	}
-	paths:= path.DijkstraAllPaths(g)
-	return int64(paths.Weight(u.ID(), v.ID()))
+	// if (!g.HasEdgeFromTo(u.ID(),v.ID())){
+	// 	return 0
+	// }
+	// var gr graph.Graph
+	// paths:= path.DijkstraAllPaths(gr)
+	// return int64(paths.Weight(u.ID(), v.ID()))
+	return 1
 }
 func Union(a, b []graph.Node) []graph.Node{
 	m := make(map[graph.Node]bool)

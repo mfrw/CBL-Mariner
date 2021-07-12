@@ -50,7 +50,13 @@ func main() {
 	logger.PanicOnError(err, "Failed to read graph file file '%s'.", *input)
 
 	leader := Clusterise.Clusterise(g)
-	fmt.Println(leader)
+	// for key, value := range leader{
+	// 	fmt.Printf("Key: ")
+	// 	fmt.Println(key)
+	// 	fmt.Printf("Value: ")
+	// 	fmt.Println(value)
+	// }
+	// fmt.Println(leader)
 	var u formats.Unravel
 	switch *format {
 	case formatLinear:
