@@ -13,30 +13,54 @@ import (
 	"microsoft.com/pkggen/pkgparallel/apirequests"
 	"microsoft.com/pkggen/pkgparallel/clustering"
 )
-
+func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool{
+	dep:=graph.NodesOf(g.From(i.ID()))
+	client := &http.Client{}
+	for _, node := range dep{
+		id:=node.ID()
+		link:="https://localhost:10000/pkg/"+id
+		req, err := http.NewRequest("GET", link, nil)
+		if err != nil {
+		fmt.Print(err.Error())
+		}
+		req.Header.Add("Accept", "application/json")
+		req.Header.Add("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+		fmt.Print(err.Error())
+		}
+		defer resp.Body.Close()
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+		fmt.Print(err.Error())
+		}
+		var responseObject APIResponse.Pkg
+		json.Unmarshal(bodyBytes, &responseObject)
+		if responseObject.StatusCode!="Built"{
+			var post APIResponse.Pkg
+			link:="https://localhost:10000/pkg/"+i.ID()
+			post.ID = i.ID()
+			post.StatusCode = "Queued"
+			req, err := http.PostForm(link, post)
+			return false
+		}
+	}
+	var post APIResponse.Pkg
+	link:="https://localhost:10000/pkg/"+i.ID()
+	post.ID = i.ID()
+	post.StatusCode = "Building"
+	req, err := http.PostForm(link, post)
+	return true
+}
 func Build(ch chan graph.Node) {
 	var i graph.Node
 	i = <-ch
-	client := &http.Client{}
-	link:= "https://localhost:10000/pkg/"+string(i.ID())
-	req, err := http.NewRequest("GET", link, nil)
-	if err != nil {
-	fmt.Print(err.Error())
-	}
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-	fmt.Print(err.Error())
-	}
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-	fmt.Print(err.Error())
-	}
-	var responseObject APIRequests.Pkg
-	json.Unmarshal(bodyBytes, &responseObject)
 	fmt.Println(<-ch)
+	var post APIResponse.Pkg
+	link:="https://localhost:10000/pkg/"+i.ID()
+	post.ID = i.ID()
+	post.StatusCode = "Built"
+	req, err := http.PostForm(link, post)
 }
 func main() {
 	file := "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/cdrkit.dot"
