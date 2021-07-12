@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
+	"net/url"
 	"gonum.org/v1/gonum/graph"
 	"microsoft.com/pkggen/internal/pkggraph"
 	// "microsoft.com/pkggen/pkgparallel/apirequests"
@@ -46,7 +46,9 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool{
 			link:="https://localhost:10000/pkg/"+string(i.ID())
 			post.PkgID = string(i.ID())
 			post.StatusCode = "Queued"
-			req, err := http.PostForm(link, post)
+			req, err := http.PostForm(link, url.Values{"PkgID":{post.PkgID}, "StatusCode":{post.StatusCode}})
+			_=req
+			_=err
 			return false
 		}
 	}
@@ -54,7 +56,9 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool{
 	link:="https://localhost:10000/pkg/"+string(i.ID())
 	post.PkgID = string(i.ID())
 	post.StatusCode = "Building"
-	req, err := http.PostForm(link, post)
+	req, err := http.PostForm(link, url.Values{"PkgID":{post.PkgID}, "StatusCode":{post.StatusCode}})
+	_=req
+	_=err
 	return true
 }
 func Build(g *pkggraph.PkgGraph, ch chan graph.Node) bool{
@@ -66,7 +70,9 @@ func Build(g *pkggraph.PkgGraph, ch chan graph.Node) bool{
 		link:="https://localhost:10000/pkg/"+string(i.ID())
 		post.PkgID = string(i.ID())
 		post.StatusCode = "Built"
-		req, err := http.PostForm(link, post)
+		req, err := http.PostForm(link, url.Values{"PkgID":{post.PkgID}, "StatusCode":{post.StatusCode}})
+		_=req
+		_=err
 		return true
 	}
 	return false
