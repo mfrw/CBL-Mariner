@@ -9,7 +9,6 @@ import (
     "github.com/gorilla/mux"
 )
 
-// Article - Our struct for all articles
 type Pkg struct {
     PkgID      	 string    `json:"PkgID"`
     StatusCode   string `json:"StatusCode"`
