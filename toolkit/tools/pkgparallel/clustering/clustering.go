@@ -1,10 +1,10 @@
-package clusterise
+package Clusterise
 
 import (
 	"math"
 	"reflect"
 	"gonum.org/v1/gonum/graph"
-
+	"gonum.org/v1/gonum/graph/path"
 	"microsoft.com/pkggen/internal/pkggraph"
 )
 
@@ -12,7 +12,8 @@ func ShortestPath(g *pkggraph.PkgGraph,u graph.Node,v graph.Node) int64 {
 	if (!g.HasEdgeFromTo(u.ID(),v.ID())){
 		return 0
 	}
-	return 1
+	paths:= path.DijkstraAllPaths(g)
+	return int64(paths.Weight(u.ID(), v.ID()))
 }
 func Union(a, b []graph.Node) []graph.Node{
 	m := make(map[graph.Node]bool)
@@ -104,7 +105,7 @@ func DetectCycle(u graph.Node, v graph.Node, g *pkggraph.PkgGraph, leader map[gr
 	return false;
 }
 
-func clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
+func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 	top:=CompTopLevels(g)
 	V:= g.AllNodes()
 	markup:= make(map[graph.Node]bool)
