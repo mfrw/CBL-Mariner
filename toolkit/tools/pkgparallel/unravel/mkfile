@@ -1,0 +1,25 @@
+
+.PHONY: RUN_0_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/cdrkit-1.1.11-8.cm1.src.rpm_cdrkit
+RUN_0_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/cdrkit-1.1.11-8.cm1.src.rpm_cdrkit: ;
+RUN_0_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/cdrkit-1.1.11-8.cm1.src.rpm_cdrkit:  BUILD_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm BUILD_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm GOAL_ALL
+
+.PHONY: RUN_1_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe(x86-64)
+RUN_1_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe(x86-64): ;
+RUN_1_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe(x86-64):  GOAL_ALL
+
+.PHONY: BUILD_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm
+BUILD_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm:
+	MAKEFLAGS= $(go-pkgworker) --input=/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm --retry-attempts=1 --cache-dir=   --work-dir=$(CHROOT_DIR) --worker-tar=$(chroot_worker) --repo-file=$(pkggen_local_repo) --rpms-dir=$(RPMS_DIR) --srpms-dir=$(SRPMS_DIR) --rpmmacros-file=$(TOOLCHAIN_MANIFESTS_DIR)/macros.override --dist-tag=.cm1 --distro-release-version=1.0 --distro-build-number=dd5ffa44 --log-file=$(LOGS_DIR)/pkggen/rpmbuilding/ipxe-1.20.1-3.cm1.src.rpm.log || echo "ipxe-1.20.1-3.cm1.src.rpm" >> $(LOGS_DIR)/pkggen/failures.txt
+BUILD_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm:  RUN_1_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe(x86-64)
+
+.PHONY: RUN_3_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe
+RUN_3_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe: ;
+RUN_3_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe:  GOAL_ALL
+BUILD_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm:  RUN_3_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/ipxe-1.20.1-3.cm1.src.rpm_ipxe
+
+.PHONY: GOAL_ALL
+GOAL_ALL: ;
+
+.PHONY: PUREMETA_6
+PUREMETA_6: ;
+PUREMETA_6:  RUN_0_/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/cdrkit-1.1.11-8.cm1.src.rpm_cdrkit
