@@ -1,4 +1,4 @@
-package apirequests
+package main
 
 import (
     "encoding/json"
@@ -7,6 +7,8 @@ import (
     "io/ioutil"
     "net/http"
     "github.com/gorilla/mux"
+    "database/sql"
+    _ "github.com/go-sql-driver/mysql"
 )
 
 type Pkg struct {
@@ -14,7 +16,17 @@ type Pkg struct {
     StatusCode   string `json:"StatusCode"`
 }
 
+var db *sql.DB
 var Pkgs []Pkg
+
+func connect() {
+    db, err = sql.Open("mysql", "root:8520@tcp(127.0.0.1:3306)/world")
+    if err != nil {
+        fmt.Println(err.Error())
+    } else {
+        fmt.Println("successfully connected to database.")
+    }
+}
 
 func homePage(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Welcome to the HomePage!")
@@ -86,4 +98,12 @@ func handleRequests() {
     myRouter.HandleFunc("/pkg/{id}", returnSinglePkgs)
 	myRouter.HandleFunc("/pkg/{id}", updatePkgs).Methods("PATCH")
     log.Fatal(http.ListenAndServe(":10000", myRouter))
+}
+
+func main() {
+    Pkgs = []Pkg{
+        Pkg{PkgID: "1", StatusCode: "Building"},
+        Pkg{PkgID: "2", StatusCode: "Built"},
+    }
+    handleRequests()
 }
