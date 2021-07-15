@@ -1,4 +1,4 @@
-package main
+package APIRequests
 
 import (
     "encoding/json"
@@ -100,6 +100,13 @@ func handleRequests() {
     log.Fatal(http.ListenAndServe(":10000", myRouter))
 }
 
+func main() {
+    Pkgs = []Pkg{
+        Pkg{PkgID: "1", StatusCode: "Building"},
+        Pkg{PkgID: "2", StatusCode: "Built"},
+    }
+    handleRequests()
+}
 func main() {
     Pkgs = []Pkg{
         Pkg{PkgID: "1", StatusCode: "Building"},

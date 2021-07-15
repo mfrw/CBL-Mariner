@@ -1,4 +1,4 @@
-package Clusterise
+package clusterise
 
 import (
 	"math"
@@ -10,9 +10,9 @@ import (
 )
 
 func ShortestPath(g *pkggraph.PkgGraph,u graph.Node,v graph.Node) int64 {
-	// if (!g.HasEdgeFromTo(u.ID(),v.ID())){
-	// 	return 0
-	// }
+	if (!g.HasEdgeFromTo(u.ID(),v.ID())){
+		return 0
+	}
 	// var gr graph.Graph
 	// paths:= path.DijkstraAllPaths(gr)
 	// return int64(paths.Weight(u.ID(), v.ID()))

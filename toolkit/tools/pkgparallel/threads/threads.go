@@ -15,7 +15,7 @@ import (
 	"microsoft.com/pkggen/internal/pkggraph"
 
 	// "microsoft.com/pkggen/pkgparallel/apirequests"
-	Clusterise "microsoft.com/pkggen/pkgparallel/clustering"
+	clusterise "microsoft.com/pkggen/pkgparallel/clustering"
 )
 
 type Pkg struct {
@@ -92,7 +92,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	leader := Clusterise.Clusterise(g)
+	leader := clusterise.Clusterise(g)
 	lists := make(map[graph.Node][]graph.Node)
 	for key, element := range leader {
 		lists[element] = append(lists[element], key)
