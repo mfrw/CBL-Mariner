@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os/exec"
 
 	"gonum.org/v1/gonum/graph"
 	"microsoft.com/pkggen/internal/logger"
@@ -21,6 +22,7 @@ import (
 type Pkg struct {
 	PkgID      string `json:"PkgID"`
 	StatusCode string `json:"StatusCode"`
+	Location string `json:"Location"`
 }
 
 func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
@@ -51,7 +53,8 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 			link := "https://localhost:10000/pkg/" + string(i.ID())
 			post.PkgID = string(i.ID())
 			post.StatusCode = "Queued"
-			req, err := http.PostForm(link, url.Values{"PkgID": {post.PkgID}, "StatusCode": {post.StatusCode}})
+			post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ string(i.ID())
+			req, err := http.PostForm(link, url.Values{"PkgID": {post.PkgID}, "StatusCode": {post.StatusCode}, "Location": {post.Location}})
 			_ = req
 			_ = err
 			return false
@@ -61,7 +64,8 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 	link := "https://localhost:10000/pkg/" + string(i.ID())
 	post.PkgID = string(i.ID())
 	post.StatusCode = "Building"
-	req, err := http.PostForm(link, url.Values{"PkgID": {post.PkgID}, "StatusCode": {post.StatusCode}})
+	post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ string(i.ID())
+	req, err := http.PostForm(link, url.Values{"PkgID": {post.PkgID}, "StatusCode": {post.StatusCode}, "Location": {post.Location}})
 	_ = req
 	_ = err
 	return true
@@ -70,14 +74,28 @@ func Build(g *pkggraph.PkgGraph, ch chan graph.Node) bool {
 	var i graph.Node
 	i = <-ch
 	if CheckBuild(g, i) {
-		fmt.Println(<-ch)
+		str:= i.ID()
+		var pkgname string
+		for _, element := range g.AllNodes(){
+			if element.ID() == str{
+				pkgname = *&element.VersionedPkg.Name
+			}
+		}
 		var post Pkg
 		link := "https://localhost:10000/pkg/" + string(i.ID())
 		post.PkgID = string(i.ID())
 		post.StatusCode = "Built"
-		req, err := http.PostForm(link, url.Values{"PkgID": {post.PkgID}, "StatusCode": {post.StatusCode}})
+		post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ string(i.ID())
+		req, err := http.PostForm(link, url.Values{"PkgID": {post.PkgID}, "StatusCode": {post.StatusCode}, "Location": {post.Location}})
 		_ = req
 		_ = err
+		command:= "sudo make build-packages PACKAGE_URL_LIST=https://packages.microsoft.com/cbl-mariner/$(RELEASE_MAJOR_ID)/prod/base/$(build_arch)/rpms SRPM_URL_LIST=https://packages.microsoft.com/cbl-mariner/$(RELEASE_MAJOR_ID)/prod/base/srpms PACKAGE_BUILD_LIST="+pkgname+"-j($nproc)"
+		cmd := exec.Command(command)
+		err1 := cmd.Run()
+		if err1 != nil {
+			log.Println(err1)
+			return false
+		}
 		return true
 	}
 	return false
@@ -105,12 +123,15 @@ func main() {
 		}
 		q = append(q, l)
 	}
+	//As of now only two currently
+	//To be in loop
 	q0 := q[0]
 	q1 := q[1]
 	go func() {
 		for len(q0) > 0 {
 			var ch chan graph.Node
 			ch <- q0[0]
+			//Find the best VM pool to work with and then push the job there
 			if Build(g, ch) {
 				q0 = q0[1:]
 			} else {

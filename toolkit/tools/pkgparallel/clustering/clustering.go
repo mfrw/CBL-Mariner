@@ -3,22 +3,22 @@ package clusterise
 import (
 	"math"
 	"reflect"
+	"fmt"
 	"gonum.org/v1/gonum/graph"
 	// "gonum.org/v1/gonum/graph/simple"
-	// "gonum.org/v1/gonum/graph/path"
+	"gonum.org/v1/gonum/graph/traverse"
+	"gonum.org/v1/gonum/graph/path"
 	"microsoft.com/pkggen/internal/pkggraph"
 )
 
 func ShortestPath(g *pkggraph.PkgGraph,u graph.Node,v graph.Node) int64 {
-	if (!g.HasEdgeFromTo(u.ID(),v.ID())){
-		return 0
-	}
-	// var gr graph.Graph
-	// paths:= path.DijkstraAllPaths(gr)
-	// return int64(paths.Weight(u.ID(), v.ID()))
-	return 1
+	fmt.Printf("Inside Shortest path")
+	// var gr traverse.Graph
+	paths:= path.DijkstraFrom(u, g)
+	return int64(paths.WeightTo(v.ID()))
 }
 func Union(a, b []graph.Node) []graph.Node{
+	fmt.Println("Inside Union")
 	m := make(map[graph.Node]bool)
 
 	for _, item := range a {
@@ -34,10 +34,12 @@ func Union(a, b []graph.Node) []graph.Node{
 }
 
 func CompTopLevels(g *pkggraph.PkgGraph) map[graph.Node]int64{
+	fmt.Println("Inside Comp Top Levels")
 	top:= make(map[graph.Node]int64)
 	V:= g.AllNodes()
 	var source graph.Node
 	for _, u := range V{
+		//Fn or test to see if it works, Simple fn to check array equal
 		if (reflect.DeepEqual(g.AllNodesFrom(u),V)){
 			source = u
 			break
@@ -109,6 +111,7 @@ func DetectCycle(u graph.Node, v graph.Node, g *pkggraph.PkgGraph, leader map[gr
 }
 
 func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
+	fmt.Println("Inside Clusterise")
 	top:=CompTopLevels(g)
 	V:= g.AllNodes()
 	markup:= make(map[graph.Node]bool)
