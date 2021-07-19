@@ -26,18 +26,19 @@ type Pkg struct {
 var Pkgs []Pkg
 
 //MongoDB locally
-func connect() (*mongo.Collection, *mongo.Client) {
+func connect() *mongo.Collection {
     clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb")
     client, err := mongo.Connect(context.TODO(), clientOptions)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	defer client.Disconnect(context.TODO())
 	fmt.Println("Connected to MongoDB!")
 
 	collection := client.Database("mariner").Collection("packages")
-	return collection,client
+	
+	return collection
 }
 var client *mongo.Client
 // func CloseClientDB(*mongo.Client) {
@@ -82,7 +83,7 @@ func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
 
 	// we created Book array
 	var books []Pkg
-    collection, client:=connect()
+    collection :=connect()
 
 	// bson.M{},  we passed empty filter. So we want to get all data.
 	cur, err := collection.Find(context.TODO(), bson.M{})
@@ -117,12 +118,12 @@ func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(books)
 	// collection.close()
-	CloseClientDB(client)
+	
 }
 
 func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
     var book Pkg
-    collection, client:= connect()
+    collection:= connect()
     w.Header().Set("Content-Type", "application/json")
 
 	// we get params with mux.
@@ -142,12 +143,12 @@ func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(book)
-	CloseClientDB(client)
+	
 }
 
 
 func createNewPkg(w http.ResponseWriter, r *http.Request) {  
-    collection, client := connect()
+    collection := connect()
     w.Header().Set("Content-Type", "application/json")
 
 	var book Pkg
@@ -166,12 +167,11 @@ func createNewPkg(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(result)
 	// collection.close()
-	CloseClientDB(client)
 }
 
 func deletePkg(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
-    collection, client:= connect()
+    collection:= connect()
     var params = mux.Vars(r)
 
 	// string to primitve.ObjectID
@@ -188,11 +188,10 @@ func deletePkg(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(deleteResult)
 	// collection.close()
-	CloseClientDB(client)
 }
 
 func updatePkgs(w http.ResponseWriter, r *http.Request) {
-    collection, client := connect()
+    collection := connect()
     w.Header().Set("Content-Type", "application/json")
     var book Pkg
 
@@ -226,7 +225,6 @@ func updatePkgs(w http.ResponseWriter, r *http.Request) {
 		book.PkgID= id
         json.NewEncoder(w).Encode(book)
 		// collection.close()
-		CloseClientDB(client)
 }
 
 func handleRequests() {
