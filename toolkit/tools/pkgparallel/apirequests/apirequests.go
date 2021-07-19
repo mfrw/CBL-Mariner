@@ -1,13 +1,13 @@
-package APIRequests
+package main
 
 import (
     "log"
     "encoding/json"
-    "io/ioutil"
+    // "io/ioutil"
     "fmt"
     "net/http"
     "github.com/gorilla/mux"
-    "time"
+    // "time"
     "context"
 
     "go.mongodb.org/mongo-driver/bson"
@@ -18,28 +18,45 @@ import (
 //Why this driver
 // add BSON tag
 type Pkg struct {
-    PkgID      	 string    `json:"PkgID"`
-    StatusCode   string `json:"StatusCode"`
-    Location     string `json:"Location"`
+    PkgID      	 string    `json:"PkgID" bson:"PkgID"`
+    StatusCode   string `json:"StatusCode" bson:"StatusCode"`
+    Location     string `json:"Location" bson:"Location"`
 }
 
 var Pkgs []Pkg
 
 //MongoDB locally
-func connect() (*mongo.Collection, context.Context) {
-    client, err := mongo.NewClient(options.Client().ApplyURI())
-    if err != nil {
-        log.Fatal(err)
-    }
-    ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-    err = client.Connect(ctx)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer client.Disconnect(ctx)
-    quickstartDatabase := client.Database("mariner")
-    pkgCollection := quickstartDatabase.Collection("packages")
-    return pkgCollection,ctx
+func connect() *mongo.Collection {
+    clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb")
+    client, err := mongo.Connect(context.TODO(), clientOptions)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Connected to MongoDB!")
+
+	collection := client.Database("mariner").Collection("packages")
+
+	return collection
+}
+type ErrorResponse struct {
+	StatusCode   int    `json:"status"`
+	ErrorMessage string `json:"message"`
+}
+
+func GetError(err error, w http.ResponseWriter) {
+
+	// log.Fatal(err.Error())
+	var response = ErrorResponse{
+		ErrorMessage: err.Error(),
+		StatusCode:   http.StatusInternalServerError,
+	}
+
+	message, _ := json.Marshal(response)
+
+	w.WriteHeader(response.StatusCode)
+	w.Write(message)
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {
@@ -48,106 +65,125 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
-    collection, context := connect()
-    cur, _ := collection.Find(context, bson.M{})
-    
-    for cur.Next(context){
-        var pkg Pkg
+    w.Header().Set("Content-Type", "application/json")
+
+	// we created Book array
+	var books []Pkg
+    collection:=connect()
+
+	// bson.M{},  we passed empty filter. So we want to get all data.
+	cur, err := collection.Find(context.TODO(), bson.M{})
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	// Close the cursor once finished
+	/*A defer statement defers the execution of a function until the surrounding function returns.
+	simply, run cur.Close() process but after cur.Next() finished.*/
+	defer cur.Close(context.TODO())
+
+	for cur.Next(context.TODO()) {
+
+		// create a value into which the single document can be decoded
+		var book Pkg
 		// & character returns the memory address of the following variable.
-		err := cur.Decode(&pkg) // decode similar to deserialize process.
+		err := cur.Decode(&book) // decode similar to deserialize process.
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		// add item our array
-		Pkgs = append(Pkgs, pkg)
-    }
-    fmt.Println("Endpoint Hit: returnAllPkgs")
-    json.NewEncoder(w).Encode(Pkgs)
+		books = append(books, book)
+	}
+
+	if err := cur.Err(); err != nil {
+		GetError(err, w)
+	}
+
+	json.NewEncoder(w).Encode(books)
 }
 
 func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
     var book Pkg
-    collection, context := connect()
-    _, err := collection.Find(context, bson.M{})
-    if (err!=nil){
-        fmt.Println("Error")
-    }
+    collection := connect()
+    w.Header().Set("Content-Type", "application/json")
 
-    var params = mux.Vars(r)
-	id, _ := primitive.ObjectIDFromHex(params["id"])
+	// we get params with mux.
+	var params = mux.Vars(r)
 
-	filter := bson.M{"_id": id}
-	err = collection.FindOne(context, filter).Decode(&book)
+	// string to primitive.ObjectID
+	PkgID, _ := params["id"]
+	// fmt.Println(params, PkgID)
 
-    vars := mux.Vars(r)
-    key := vars["id"]
+	// We create filter. If it is unnecessary to sort data for you, you can use bson.M{}
+	filter := bson.M{"PkgID":PkgID}
+	err := collection.FindOne(context.TODO(), filter).Decode(&book)
 
-    for _, pkg := range Pkgs {
-        if pkg.PkgID == key {
-            json.NewEncoder(w).Encode(pkg)
-        }
-    }
+	if err != nil {
+		GetError(err, w)
+		return
+	}
+
+	json.NewEncoder(w).Encode(book)
 }
 
 
 func createNewPkg(w http.ResponseWriter, r *http.Request) {  
-    collection, context := connect()
-    _, err := collection.Find(context, bson.M{})
-    if (err!=nil){
-        fmt.Println(err.Error)
-    }
-
+    collection := connect()
     w.Header().Set("Content-Type", "application/json")
 
 	var book Pkg
 
 	// we decode our body request params
 	_ = json.NewDecoder(r.Body).Decode(&book)
+	fmt.Println(book)
 
 	// insert our book model.
-	result, err := collection.InsertOne(context, book)
+	result, err := collection.InsertOne(context.TODO(), book)
 
+	if err != nil {
+		GetError(err, w)
+		return
+	}
 
 	json.NewEncoder(w).Encode(result)
 }
 
 func deletePkg(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
-    collection, context := connect()
-    _, err := collection.Find(context, bson.M{})
-    if (err!=nil){
-        fmt.Println(err.Error)
-    }
-	// get params
-	var params = mux.Vars(r)
+    collection:= connect()
+    var params = mux.Vars(r)
 
 	// string to primitve.ObjectID
-	id, err := primitive.ObjectIDFromHex(params["id"])
+	id, err := primitive.ObjectIDFromHex(params["PkgID"])
 
 	// prepare filter.
-	filter := bson.M{"_id": id}
+	filter := bson.M{"PkgID": id}
 
-	deleteResult, err := collection.DeleteOne(context, filter)
+	deleteResult, err := collection.DeleteOne(context.TODO(), filter)
 
+	if err != nil {
+	    GetError(err, w)
+		return
+	}
 	json.NewEncoder(w).Encode(deleteResult)
 }
 
 func updatePkgs(w http.ResponseWriter, r *http.Request) {
-    collection, context := connect()
-    cur, _ := collection.Find(context, bson.M{})
-    _=cur
+    collection := connect()
     w.Header().Set("Content-Type", "application/json")
+    var book Pkg
 
-	var params = mux.Vars(r)
+    var params = mux.Vars(r)
 
 	//Get id from parameters
-	id, _ := primitive.ObjectIDFromHex(params["id"])
+	id, _ := primitive.ObjectIDFromHex(params["PkgID"])
 
-	var book Pkg
 
 	// Create filter
-	filter := bson.M{"_id": id}
+	filter := bson.M{"PkgID": id}
 
 	// Read update model from body request
 	_ = json.NewDecoder(r.Body).Decode(&book)
@@ -156,25 +192,27 @@ func updatePkgs(w http.ResponseWriter, r *http.Request) {
 			{"PkgID", book.PkgID},
 			{"StatusCode", book.StatusCode},
 			{"Location", book.Location},
-        },
-    }}
+        },}}
 
-	err1 := collection.FindOneAndUpdate(context, filter, update).Decode(&book)
-    if err1 != nil {
-        fmt.Println("Error")
-    }
-    book.PkgID = string(id)
+        err := collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&book)
 
-	json.NewEncoder(w).Encode(book)
+        if err != nil {
+            GetError(err, w)
+            return
+        }
+    
+        book.PkgID = id.Hex()
+    
+        json.NewEncoder(w).Encode(book)
 }
 
 func handleRequests() {
     myRouter := mux.NewRouter().StrictSlash(true)
     myRouter.HandleFunc("/", homePage)
-    myRouter.HandleFunc("/packages", returnAllPkgs)
+    myRouter.HandleFunc("/packages", returnAllPkgs).Methods("GET")
     myRouter.HandleFunc("/pkg", createNewPkg).Methods("POST")
     myRouter.HandleFunc("/pkg/{id}", deletePkg).Methods("DELETE")
-    myRouter.HandleFunc("/pkg/{id}", returnSinglePkgs)
+    myRouter.HandleFunc("/pkg/{id}", returnSinglePkgs).Methods("GET")
 	myRouter.HandleFunc("/pkg/{id}", updatePkgs).Methods("PATCH")
     log.Fatal(http.ListenAndServe(":10000", myRouter))
 }

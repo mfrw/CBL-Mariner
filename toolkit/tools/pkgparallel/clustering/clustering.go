@@ -2,23 +2,23 @@ package clusterise
 
 import (
 	"math"
-	"reflect"
+	// "reflect"
 	"fmt"
 	"gonum.org/v1/gonum/graph"
 	// "gonum.org/v1/gonum/graph/simple"
-	"gonum.org/v1/gonum/graph/traverse"
+	// "gonum.org/v1/gonum/graph/traverse"
 	"gonum.org/v1/gonum/graph/path"
 	"microsoft.com/pkggen/internal/pkggraph"
 )
 
 func ShortestPath(g *pkggraph.PkgGraph,u graph.Node,v graph.Node) int64 {
-	fmt.Printf("Inside Shortest path")
-	// var gr traverse.Graph
-	paths:= path.DijkstraFrom(u, g)
+	// fmt.Printf("Inside Shortest path")
+	lol:= graph.Graph(g)
+	paths:= path.DijkstraFrom(u, lol)
 	return int64(paths.WeightTo(v.ID()))
 }
 func Union(a, b []graph.Node) []graph.Node{
-	fmt.Println("Inside Union")
+	// fmt.Println("Inside Union")
 	m := make(map[graph.Node]bool)
 
 	for _, item := range a {
@@ -34,19 +34,28 @@ func Union(a, b []graph.Node) []graph.Node{
 }
 
 func CompTopLevels(g *pkggraph.PkgGraph) map[graph.Node]int64{
-	fmt.Println("Inside Comp Top Levels")
+	// fmt.Println("Inside Comp Top Levels")
 	top:= make(map[graph.Node]int64)
 	V:= g.AllNodes()
+	// fmt.Println(len(V))
 	var source graph.Node
-	for _, u := range V{
+	for i, u := range V{
 		//Fn or test to see if it works, Simple fn to check array equal
-		if (reflect.DeepEqual(g.AllNodesFrom(u),V)){
+		D:=V
+		D=append(D[:i], D[i+1:]...)
+		// fmt.Println(D)
+		if (graph.NodesOf(g.To(u.ID()))==nil){
 			source = u
 			break
 		}
 	}
+	// fmt.Println(source)
 	for _,u := range V{
 		dist := ShortestPath(g,source,u)
+		fmt.Println(u, dist)
+		if dist == int64(math.Inf(1)){
+			dist = 0
+		}
 		top[u]=dist
 	}
 	return top
@@ -135,6 +144,7 @@ func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 					continue
 				}
 				if (DetectCycle(u, v, g, leader, top)){
+					// fmt.Printf("Cycle From")
 					continue
 				}
 				leader[u]=leader[v]
@@ -146,6 +156,7 @@ func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 					continue
 				}
 				if (DetectCycle(u, v, g, leader, top)){
+					// fmt.Printf("Cycle to")
 					continue
 				}
 				leader[u]=leader[v]
