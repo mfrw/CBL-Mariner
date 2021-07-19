@@ -13,7 +13,7 @@ import (
     "go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-    "go.mongodb.org/mongo-driver/bson/primitive"
+    // "go.mongodb.org/mongo-driver/bson/primitive"
 )
 //Why this driver
 // add BSON tag
@@ -26,7 +26,7 @@ type Pkg struct {
 var Pkgs []Pkg
 
 //MongoDB locally
-func connect() *mongo.Collection {
+func connect() (*mongo.Collection, *mongo.Client) {
     clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb")
     client, err := mongo.Connect(context.TODO(), clientOptions)
 
@@ -37,9 +37,22 @@ func connect() *mongo.Collection {
 	fmt.Println("Connected to MongoDB!")
 
 	collection := client.Database("mariner").Collection("packages")
-
-	return collection
+	return collection,client
 }
+var client *mongo.Client
+// func CloseClientDB(*mongo.Client) {
+//     if client == nil {
+//         return
+//     }
+
+//     err := client.Disconnect(context.TODO())
+//     if err != nil {
+//         log.Fatal(err)
+//     }
+
+//     // TODO optional you can log your closed MongoDB client
+//     fmt.Println("Connection to MongoDB closed.")
+// }
 type ErrorResponse struct {
 	StatusCode   int    `json:"status"`
 	ErrorMessage string `json:"message"`
@@ -69,7 +82,7 @@ func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
 
 	// we created Book array
 	var books []Pkg
-    collection:=connect()
+    collection, client:=connect()
 
 	// bson.M{},  we passed empty filter. So we want to get all data.
 	cur, err := collection.Find(context.TODO(), bson.M{})
@@ -103,11 +116,13 @@ func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(books)
+	// collection.close()
+	CloseClientDB(client)
 }
 
 func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
     var book Pkg
-    collection := connect()
+    collection, client:= connect()
     w.Header().Set("Content-Type", "application/json")
 
 	// we get params with mux.
@@ -127,11 +142,12 @@ func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(book)
+	CloseClientDB(client)
 }
 
 
 func createNewPkg(w http.ResponseWriter, r *http.Request) {  
-    collection := connect()
+    collection, client := connect()
     w.Header().Set("Content-Type", "application/json")
 
 	var book Pkg
@@ -149,15 +165,17 @@ func createNewPkg(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(result)
+	// collection.close()
+	CloseClientDB(client)
 }
 
 func deletePkg(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
-    collection:= connect()
+    collection, client:= connect()
     var params = mux.Vars(r)
 
 	// string to primitve.ObjectID
-	id, err := primitive.ObjectIDFromHex(params["PkgID"])
+	id, _ :=params["id"]
 
 	// prepare filter.
 	filter := bson.M{"PkgID": id}
@@ -169,41 +187,46 @@ func deletePkg(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(deleteResult)
+	// collection.close()
+	CloseClientDB(client)
 }
 
 func updatePkgs(w http.ResponseWriter, r *http.Request) {
-    collection := connect()
+    collection, client := connect()
     w.Header().Set("Content-Type", "application/json")
     var book Pkg
 
     var params = mux.Vars(r)
-
+	fmt.Println(params)
 	//Get id from parameters
-	id, _ := primitive.ObjectIDFromHex(params["PkgID"])
-
+	id, _ := params["id"]
+	fmt.Println(id)
 
 	// Create filter
 	filter := bson.M{"PkgID": id}
-
+	// book.PkgID = id.Hex()
 	// Read update model from body request
 	_ = json.NewDecoder(r.Body).Decode(&book)
     update := bson.D{
 		{"$set", bson.D{
-			{"PkgID", book.PkgID},
-			{"StatusCode", book.StatusCode},
-			{"Location", book.Location},
-        },}}
+				{"PkgID", book.PkgID},
+				{"StatusCode", book.StatusCode},
+				{"Location", book.Location},
+    	}},
+	}
 
-        err := collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&book)
-
+        err:= collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&book)
+		// result
         if err != nil {
             GetError(err, w)
+			fmt.Println(err)
             return
         }
-    
-        book.PkgID = id.Hex()
-    
+		// fmt.Printf("Updated %v Documents!\n", result.ModifiedCount)
+		book.PkgID= id
         json.NewEncoder(w).Encode(book)
+		// collection.close()
+		CloseClientDB(client)
 }
 
 func handleRequests() {

@@ -15,7 +15,7 @@ import (
 	"bytes"
 	"strconv"
 	// "time"
-	// "sync"
+	"sync"
 	"gonum.org/v1/gonum/graph"
 	"microsoft.com/pkggen/internal/logger"
 	"microsoft.com/pkggen/internal/pkggraph"
@@ -40,6 +40,7 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 		// str = str[:1]
 		link := "http://localhost:10000/pkg/"+ID
 		resp, err := http.Get(link)
+		resp.Body.Close()
 		if err != nil {
 			fmt.Print(err)
 		}
@@ -49,18 +50,46 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 			link := "http://localhost:10000/pkg" + strconv.Itoa(int(i.ID()))
 			post.PkgID = strconv.Itoa(int(i.ID()))
 			post.StatusCode = "Queued"
-			post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ strconv.Itoa(int(i.ID()))
+			path:=""
+			for _, element := range g.AllNodes(){
+				// fmt.Println(element.ID())
+				if element.ID() == i.ID(){
+					path = element.SourceDir
+					break
+				}
+			}
+			// fmt.Println(path)
+			post.Location = path
+			client := &http.Client{}
+			if path=="" || path=="<NO-SRPM-PATH>"{
+				j,_:=json.Marshal(map[string]interface{}{
+					"PkgID": post.PkgID,
+					"StatusCode":"Built",
+					"Location":post.Location,
+				}) 
+				req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+				resp, err := client.Do(req)
+				// fmt.Println(req, err)
+				_ = resp
+				_ = err
+				req.Body.Close()
+				resp.Body.Close()
+				return true
+			}
 			j,_:=json.Marshal(map[string]string{
 				"PkgID": post.PkgID,
 				"StatusCode":post.StatusCode,
 				"Location":post.Location,
 			}) 
-			
-			// var js = []byte(j)
-			// jstr := string(js)
-			req, err := http.Post( link, "application/json", bytes.NewBuffer(j))
-			_ = req
+			// client = &http.Client{}
+			req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+			resp, err := client.Do(req)
+			req.Body.Close()
+			resp.Body.Close()
+			// fmt.Println(req, err)
+			_ = resp
 			_ = err
+			// defer resp.Body.Close()
 			// resp, err := client.Do(req)
 			// fmt.Println(post.StatusCode)
 			return false
@@ -74,22 +103,48 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 			json.Unmarshal(bodyBytes, &responseObject)
 			if responseObject.StatusCode != "Built" {
 				var post Pkg
-				link := "http://localhost:10000/pkg" 
+				link := "http://localhost:10000/pkg/" +strconv.Itoa(int(i.ID()))
 				post.PkgID = strconv.Itoa(int(i.ID()))
 				post.StatusCode = "Queued"
-				post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ strconv.Itoa(int(i.ID()))
-				j,_:=json.Marshal(map[string]string{
+				path:=""
+				for _, element := range g.AllNodes(){
+					// fmt.Println(element.ID())
+					if element.ID() == i.ID(){
+						path = element.SourceDir
+						break
+					}
+				}
+				post.Location = path
+				client := &http.Client{}
+				if path=="" || path=="<NO-SRPM-PATH>"{
+					j,_:=json.Marshal(map[string]interface{}{
+						"PkgID": post.PkgID,
+						"StatusCode":"Built",
+						"Location":post.Location,
+					}) 
+					req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+					resp, err := client.Do(req)
+					// fmt.Println(req, err)
+					_ = resp
+					_ = err
+					req.Body.Close()
+					resp.Body.Close()
+					return true
+				}
+				j,_:=json.Marshal(map[string]interface{}{
 					"PkgID": post.PkgID,
 					"StatusCode":post.StatusCode,
 					"Location":post.Location,
 				}) 
 				
-				// var js = []byte(j)
-				// jstr := string(js)
-				req, err := http.Post( link, "application/json", bytes.NewBuffer(j))
-				// resp, err := client.Do(req)
-				_ = req
+				// client = &http.Client{}
+				req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+				resp, err := client.Do(req)
+				// fmt.Println(req, err)
+				_ = resp
 				_ = err
+				req.Body.Close()
+				resp.Body.Close()
 				// defer resp.Body.Close()
 				// defer req.Body.Close()
 				// fmt.Println(post.StatusCode)
@@ -98,21 +153,47 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 		}
 	}
 	var post Pkg
-	link := "http://localhost:10000/pkg"
+	link := "http://localhost:10000/pkg/"+ strconv.Itoa(int(i.ID()))
 	post.PkgID = strconv.Itoa(int(i.ID()))
 	post.StatusCode = "Building"
-	post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ strconv.Itoa(int(i.ID()))
-	j,_:=json.Marshal(map[string]string{
+	path:=""
+	for _, element := range g.AllNodes(){
+		// fmt.Println(element.ID())
+		if element.ID() == i.ID(){
+			path = element.SourceDir
+			break
+		}
+	}
+	post.Location = path
+	client := &http.Client{}
+	if path=="" || path=="<NO-SRPM-PATH>"{
+		j,_:=json.Marshal(map[string]interface{}{
+			"PkgID": post.PkgID,
+			"StatusCode":"Built",
+			"Location":post.Location,
+		}) 
+		req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+		resp, err := client.Do(req)
+		// fmt.Println(req, err)
+		_ = resp
+		_ = err
+		req.Body.Close()
+		resp.Body.Close()
+		return true
+	}
+	j,_:=json.Marshal(map[string]interface{}{
 		"PkgID": post.PkgID,
 		"StatusCode":post.StatusCode,
 		"Location":post.Location,
 	}) 
-	
-	// var js = []byte(j)
-	// jstr := string(js)
-	req, err := http.Post( link, "application/json", bytes.NewBuffer(j))
-	_ = req
+	// client = &http.Client{}
+	req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+	resp, err := client.Do(req)
+	// fmt.Println(req, err)
+	_ = resp
 	_ = err
+	req.Body.Close()
+	resp.Body.Close()
 	// resp, err := client.Do(req)
 	// defer resp.Body.Close()
 	// defer req.Body.Close()
@@ -124,9 +205,10 @@ func Build(g *pkggraph.PkgGraph, i graph.Node) bool {
 		// str:= i.ID()
 		var path string
 		for _, element := range g.AllNodes(){
-			fmt.Println(element.ID())
+			// fmt.Println(element.ID())
 			if element.ID() == i.ID(){
-				path = element.SrpmPath
+				path = element.SourceDir
+				break
 			}
 		}
 		// tr := &http.Transport{
@@ -135,33 +217,50 @@ func Build(g *pkggraph.PkgGraph, i graph.Node) bool {
 		// client := &http.Client{Transport: tr}
 		var post Pkg
 		str := strconv.Itoa(int(i.ID()))
-		link := "http://localhost:10000/pkg"
+		link := "http://localhost:10000/pkg/"+str
 		post.PkgID = str
 		post.StatusCode = "Built"
-		post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ str
-		j,_:=json.Marshal(map[string]string{
+		post.Location = path
+		client:=&http.Client{}
+		if path=="" || path=="<NO-SRPM-PATH>"{
+			j,_:=json.Marshal(map[string]interface{}{
+				"PkgID": post.PkgID,
+				"StatusCode":"Built",
+				"Location":post.Location,
+			}) 
+			req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+			resp, err := client.Do(req)
+			// fmt.Println(req, err)
+			_ = resp
+			_ = err
+			req.Body.Close()
+			resp.Body.Close()
+			return true
+		}
+		j,_:=json.Marshal(map[string]interface{}{
 			"PkgID": post.PkgID,
 			"StatusCode":post.StatusCode,
 			"Location":post.Location,
 		}) 
+		// fmt.Println(post.StatusCode)
 		
-		// var js = []byte(j)
-		// jstr := string(js)
-		req, err := http.Post( link, "application/json", bytes.NewBuffer(j))
-		// resp, err := client.Do(req)
-		fmt.Println(req, err)
-		_ = req
-		_ = err
-		// defer resp.Body.Close()
-		// defer req.Body.Close()
-		fmt.Println(post.StatusCode)
-		command:= "sudo make build-packages SRPM_DIR="+path+" -j($nproc)"
+		command:= "sudo make build-packages SPEC_DIR="+path+" -j($nproc)"
 		cmd := exec.Command("bash", "-c", command)
 		err1 := cmd.Run()
 		if err1 != nil {
 			log.Println(err1)
 			return false
 		}
+		
+		// var js = []byte(j)
+		// jstr := string(js)
+		req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
+		resp, err := client.Do(req)
+		// fmt.Println(req, err)
+		_ = resp
+		_ = err
+		req.Body.Close()
+		resp.Body.Close()
 		return true
 	}
 	return false
@@ -191,25 +290,38 @@ func main() {
 			link := "http://localhost:10000/pkg"
 			post.PkgID = str
 			post.StatusCode = "Starting"
-			post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ str
-			j,_:=json.Marshal(post) 
-			var js = []byte(j)
+			path:=""
+			for _, element := range g.AllNodes(){
+				// fmt.Println(element.ID())
+				if element.ID() == i.ID(){
+					path = element.SourceDir
+					break
+				}
+			}
+			post.Location = path
+			j,_:=json.Marshal(map[string]interface{}{
+				"PkgID": post.PkgID,
+				"StatusCode":post.StatusCode,
+				"Location":post.Location,
+			}) 
 			// jstr := string(js)
-			_, _ = http.NewRequest("POST", link, bytes.NewBuffer(js))
+			client := &http.Client{}
+			req, err:= http.NewRequest("POST", link, bytes.NewBuffer(j))
 			// fmt.Println(req)
-			// resp, err := client.Do(req)
-			// _=err
-			// defer resp.Body.Close()
+			resp, _ := client.Do(req)
+			_=err
+			req.Body.Close()
+			resp.Body.Close()
 			// defer req.Body.Close()
 		}
 		q = append(q, l)
 	}
 	//As of now only two currently
 	//To be in loop
-	// var wg sync.WaitGroup
-	// wg.Add(len(q))
+	var wg sync.WaitGroup
+	wg.Add(len(q))
 	for i:=0; i<len(q); i++ {
-		// go func() {
+		go func() {
 			for len(q[i]) > 0 && i< len(q){
 				//Find the best VM pool to work with and then push the job there
 				if Build(g, q[i][0]) {
@@ -219,17 +331,18 @@ func main() {
 						q[i] = q[i][1:]
 					}
 				} else {
-					if len(q[i])==1{
-						continue
-					} else {
+					// if len(q[i])==1{
+					// 	continue
+					// } else {
 						pkg := q[i][0]
 						q[i] = append(q[i], pkg)
 						q[i] = q[i][1:]
 					}
 				}
-			}
-		// 	wg.Done()
-		// }()
-	}
-	// wg.Wait()
+			
+			wg.Done()
+		}()
+	// }
+	wg.Wait()
+}
 }

@@ -1,4 +1,5 @@
 package main
+
 import (
 	"fmt"
 	// "log"
@@ -6,10 +7,10 @@ import (
 	// "microsoft.com/pkggen/internal/logger"
 	// "microsoft.com/pkggen/internal/pkggraph"
 	// clusterise "microsoft.com/pkggen/pkgparallel/clustering"
-	"strconv"
+	"bytes"
 	"encoding/json"
 	"net/http"
-	"bytes"
+	"strconv"
 	// "crypto/tls"
 )
 type Pkg struct {
@@ -21,7 +22,7 @@ type Pkg struct {
 
 func main() {
 	// logger.InitBestEffort("/tmp/somelog", "INFO")
-	// file := "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/cdrkit.dot"
+	// file := "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/files/reverse-cdrkit.dot"
 	// g := pkggraph.NewPkgGraph()
 	// err := pkggraph.ReadDOTGraphFile(g, file)
 	// if err != nil {
@@ -38,30 +39,31 @@ func main() {
 	// tr := &http.Transport{
     //     TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
     // }
-    // client := &http.Client{Transport: tr}
+    client := &http.Client{}
 	var post Pkg
-	str := strconv.Itoa(int(4))
-	link := "http://localhost:10000/pkg"
+	str := strconv.Itoa(int(1))
+	link := "http://localhost:10000/pkg/1"
 	_=link
 	post.PkgID = str
-	post.StatusCode = "Starting"
-	post.Location = "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/"+ str
+	post.StatusCode = "Queued"
+	post.Location = "/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SPECS/bash-4.4.18-6.cm1/bash.spec"
 	j,_:=json.Marshal(map[string]string{
 		"PkgID": post.PkgID,
 		"StatusCode":post.StatusCode,
 		"Location":post.Location,
 	}) 
 	
-    resp, err := http.Post(link, "application/json", bytes.NewBuffer(j))
+    req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j))
 
     if err != nil {
         fmt.Println(err)
     }
+	resp, _:=client.Do(req)
+	fmt.Println(resp)
+    // var res map[string]interface{}
 
-    var res map[string]interface{}
+    // json.NewDecoder(resp.Body).Decode(&res)
 
-    json.NewDecoder(resp.Body).Decode(&res)
-
-    fmt.Println(res)
+    // fmt.Println(res)
 	// defer req.Body.Close()
 }
