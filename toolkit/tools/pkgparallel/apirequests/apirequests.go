@@ -1,34 +1,59 @@
 package main
 
 import (
-    "log"
-    "encoding/json"
-    // "io/ioutil"
-    "fmt"
-    "net/http"
-    "github.com/gorilla/mux"
-    // "time"
-    "context"
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"sync"
 
-    "go.mongodb.org/mongo-driver/bson"
+	"github.com/gorilla/mux"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-    // "go.mongodb.org/mongo-driver/bson/primitive"
+	// "go.mongodb.org/mongo-driver/bson/primitive"
 )
+
 //Why this driver
 // add BSON tag
 type Pkg struct {
-    PkgID      	 string    `json:"PkgID" bson:"PkgID"`
-    StatusCode   string `json:"StatusCode" bson:"StatusCode"`
-    Location     string `json:"Location" bson:"Location"`
+	PkgID      string `json:"PkgID" bson:"PkgID"`
+	StatusCode string `json:"StatusCode" bson:"StatusCode"`
+	Location   string `json:"Location" bson:"Location"`
 }
 
 var Pkgs []Pkg
 
+type mgoClient struct {
+	once   sync.Once
+	client *mongo.Client
+}
+
+func (m *mgoClient) Close() {
+	m.once.Do(
+		func() {
+			m.client.Disconnect(context.TODO())
+		})
+}
+
+func NewMgoClient(uri string, ctx context.Context) (*mgoClient, error) {
+	clientOptions := options.Client().ApplyURI(uri)
+	client, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		return nil, err
+	}
+	return &mgoClient{client: client}, nil
+}
+
+func (m *mgoClient) GetCollection(db string, coll string) *mongo.Collection {
+	return m.client.Database(db).Collection(coll)
+}
+
 //MongoDB locally
 func connect() *mongo.Collection {
-    clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb")
-    client, err := mongo.Connect(context.TODO(), clientOptions)
+	clientOptions := options.Client().ApplyURI("mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb")
+	client, err := mongo.Connect(context.TODO(), clientOptions)
 
 	if err != nil {
 		log.Fatal(err)
@@ -37,10 +62,10 @@ func connect() *mongo.Collection {
 	fmt.Println("Connected to MongoDB!")
 
 	collection := client.Database("mariner").Collection("packages")
-	
+
 	return collection
 }
-var client *mongo.Client
+
 // func CloseClientDB(*mongo.Client) {
 //     if client == nil {
 //         return
@@ -74,16 +99,16 @@ func GetError(err error, w http.ResponseWriter) {
 }
 
 func homePage(w http.ResponseWriter, r *http.Request) {
-    fmt.Fprintf(w, "Welcome to the HomePage!")
-    fmt.Println("Endpoint Hit: homePage")
+	fmt.Fprintf(w, "Welcome to the HomePage!")
+	fmt.Println("Endpoint Hit: homePage")
 }
 
-func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
+func (m *mgoClient) returnAllPkgs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 
 	// we created Book array
 	var books []Pkg
-    collection :=connect()
+	collection := m.GetCollection("mariner", "packages")
 
 	// bson.M{},  we passed empty filter. So we want to get all data.
 	cur, err := collection.Find(context.TODO(), bson.M{})
@@ -118,13 +143,13 @@ func returnAllPkgs(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(books)
 	// collection.close()
-	
+
 }
 
-func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
-    var book Pkg
-    collection:= connect()
-    w.Header().Set("Content-Type", "application/json")
+func (m *mgoClient) returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
+	var book Pkg
+	collection := m.GetCollection("mariner", "packages")
+	w.Header().Set("Content-Type", "application/json")
 
 	// we get params with mux.
 	var params = mux.Vars(r)
@@ -134,7 +159,7 @@ func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println(params, PkgID)
 
 	// We create filter. If it is unnecessary to sort data for you, you can use bson.M{}
-	filter := bson.M{"PkgID":PkgID}
+	filter := bson.M{"PkgID": PkgID}
 	err := collection.FindOne(context.TODO(), filter).Decode(&book)
 
 	if err != nil {
@@ -143,19 +168,18 @@ func returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(book)
-	
+
 }
 
-
-func createNewPkg(w http.ResponseWriter, r *http.Request) {  
-    collection := connect()
-    w.Header().Set("Content-Type", "application/json")
+func (m *mgoClient) createNewPkg(w http.ResponseWriter, r *http.Request) {
+	collection := m.GetCollection("mariner", "packages")
+	w.Header().Set("Content-Type", "application/json")
 
 	var book Pkg
 
 	// we decode our body request params
 	_ = json.NewDecoder(r.Body).Decode(&book)
-	fmt.Println(book)
+	// fmt.Println(book)
 
 	// insert our book model.
 	result, err := collection.InsertOne(context.TODO(), book)
@@ -169,13 +193,13 @@ func createNewPkg(w http.ResponseWriter, r *http.Request) {
 	// collection.close()
 }
 
-func deletePkg(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
-    collection:= connect()
-    var params = mux.Vars(r)
+func (m *mgoClient) deletePkg(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	collection := m.GetCollection("mariner", "packages")
+	var params = mux.Vars(r)
 
 	// string to primitve.ObjectID
-	id, _ :=params["id"]
+	id, _ := params["id"]
 
 	// prepare filter.
 	filter := bson.M{"PkgID": id}
@@ -183,65 +207,71 @@ func deletePkg(w http.ResponseWriter, r *http.Request) {
 	deleteResult, err := collection.DeleteOne(context.TODO(), filter)
 
 	if err != nil {
-	    GetError(err, w)
+		GetError(err, w)
 		return
 	}
 	json.NewEncoder(w).Encode(deleteResult)
 	// collection.close()
 }
 
-func updatePkgs(w http.ResponseWriter, r *http.Request) {
-    collection := connect()
-    w.Header().Set("Content-Type", "application/json")
-    var book Pkg
+func (m *mgoClient) updatePkgs(w http.ResponseWriter, r *http.Request) {
+	collection := m.GetCollection("mariner", "packages")
+	w.Header().Set("Content-Type", "application/json")
+	var book Pkg
 
-    var params = mux.Vars(r)
-	fmt.Println(params)
+	var params = mux.Vars(r)
+	// fmt.Println(params)
 	//Get id from parameters
 	id, _ := params["id"]
-	fmt.Println(id)
+	// fmt.Println(id)
 
 	// Create filter
 	filter := bson.M{"PkgID": id}
 	// book.PkgID = id.Hex()
 	// Read update model from body request
 	_ = json.NewDecoder(r.Body).Decode(&book)
-    update := bson.D{
+	update := bson.D{
 		{"$set", bson.D{
-				{"PkgID", book.PkgID},
-				{"StatusCode", book.StatusCode},
-				{"Location", book.Location},
-    	}},
+			{"PkgID", book.PkgID},
+			{"StatusCode", book.StatusCode},
+			{"Location", book.Location},
+		}},
 	}
 
-        err:= collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&book)
-		// result
-        if err != nil {
-            GetError(err, w)
-			fmt.Println(err)
-            return
-        }
-		// fmt.Printf("Updated %v Documents!\n", result.ModifiedCount)
-		book.PkgID= id
-        json.NewEncoder(w).Encode(book)
-		// collection.close()
+	err := collection.FindOneAndUpdate(context.TODO(), filter, update).Decode(&book)
+	// result
+	if err != nil {
+		GetError(err, w)
+		// fmt.Println(err)
+		return
+	}
+	// fmt.Printf("Updated %v Documents!\n", result.ModifiedCount)
+	book.PkgID = id
+	json.NewEncoder(w).Encode(book)
+	// collection.close()
 }
 
 func handleRequests() {
-    myRouter := mux.NewRouter().StrictSlash(true)
-    myRouter.HandleFunc("/", homePage)
-    myRouter.HandleFunc("/packages", returnAllPkgs).Methods("GET")
-    myRouter.HandleFunc("/pkg", createNewPkg).Methods("POST")
-    myRouter.HandleFunc("/pkg/{id}", deletePkg).Methods("DELETE")
-    myRouter.HandleFunc("/pkg/{id}", returnSinglePkgs).Methods("GET")
-	myRouter.HandleFunc("/pkg/{id}", updatePkgs).Methods("PATCH")
-    log.Fatal(http.ListenAndServe(":10000", myRouter))
+	myRouter := mux.NewRouter().StrictSlash(true)
+	myRouter.HandleFunc("/", homePage)
+	mgocl, err := NewMgoClient("mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=mongodb", context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer mgocl.Close()
+
+	myRouter.HandleFunc("/packages", mgocl.returnAllPkgs).Methods("GET")
+	myRouter.HandleFunc("/pkg", mgocl.createNewPkg).Methods("POST")
+	myRouter.HandleFunc("/pkg/{id}", mgocl.deletePkg).Methods("DELETE")
+	myRouter.HandleFunc("/pkg/{id}", mgocl.returnSinglePkgs).Methods("GET")
+	myRouter.HandleFunc("/pkg/{id}", mgocl.updatePkgs).Methods("PATCH")
+	log.Fatal(http.ListenAndServe(":10000", myRouter))
 }
 
 func main() {
-    Pkgs = []Pkg{
-        Pkg{PkgID: "1", StatusCode: "Building", Location:"/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/pk1"},
-        Pkg{PkgID: "2", StatusCode: "Built", Location:"/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/pk2"},
-    }
-    handleRequests()
+	Pkgs = []Pkg{
+		Pkg{PkgID: "1", StatusCode: "Building", Location: "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/pk1"},
+		Pkg{PkgID: "2", StatusCode: "Built", Location: "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/pk2"},
+	}
+	handleRequests()
 }

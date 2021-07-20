@@ -17,6 +17,7 @@ import (
 	// "time"
 	"sync"
 	"gonum.org/v1/gonum/graph"
+	"os"
 	"microsoft.com/pkggen/internal/logger"
 	"microsoft.com/pkggen/internal/pkggraph"
 
@@ -70,7 +71,7 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 				req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
 				resp, err := client.Do(req)
 				// fmt.Println(req, err)
-				_ = resp
+				// _ = resp
 				_ = err
 				req.Body.Close()
 				resp.Body.Close()
@@ -87,7 +88,7 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 			req.Body.Close()
 			resp.Body.Close()
 			// fmt.Println(req, err)
-			_ = resp
+			// _ = resp
 			_ = err
 			// defer resp.Body.Close()
 			// resp, err := client.Do(req)
@@ -125,7 +126,7 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 					req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
 					resp, err := client.Do(req)
 					// fmt.Println(req, err)
-					_ = resp
+					// _ = resp
 					_ = err
 					req.Body.Close()
 					resp.Body.Close()
@@ -141,7 +142,7 @@ func CheckBuild(g *pkggraph.PkgGraph, i graph.Node) bool {
 				req, err := http.NewRequest("PATCH", link, bytes.NewBuffer(j) )
 				resp, err := client.Do(req)
 				// fmt.Println(req, err)
-				_ = resp
+				// _ = resp
 				_ = err
 				req.Body.Close()
 				resp.Body.Close()
@@ -244,12 +245,24 @@ func Build(g *pkggraph.PkgGraph, i graph.Node) bool {
 		}) 
 		// fmt.Println(post.StatusCode)
 		
-		command:= "sudo make build-packages SPEC_DIR="+path+" -j($nproc)"
-		cmd := exec.Command("bash", "-c", command)
-		err1 := cmd.Run()
-		if err1 != nil {
-			log.Println(err1)
-			return false
+		os.Chdir("/home/rakshaa/CBL-Mariner/toolkit")
+		// command:= "REBUILD_TOOLS=y"
+		// cmd := exec.Command("sudo", "make", "toolchain", command)
+		// out, err := cmd.Output()
+
+		// cmd.Stderr = os.Stderr
+		// cmd.Stdin = os.Stdin
+		// out, err := cmd.Output()
+		command:= "SPECS_DIR="+path
+		cmd := exec.Command("sudo", "make", "build-packages", command)
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+
+		out, err := cmd.Output()
+		if err != nil {
+			fmt.Println("Err", err)
+		} else {
+			fmt.Println("OUT:", string(out))
 		}
 		
 		// var js = []byte(j)
