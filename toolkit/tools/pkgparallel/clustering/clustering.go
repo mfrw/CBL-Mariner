@@ -92,7 +92,7 @@ func DetectCycle(u graph.Node, v graph.Node, g *pkggraph.PkgGraph, leader map[gr
 	for len(q) > 0 {
 		var w graph.Node
 		w, q = q[0], q[1:]
-		for _, node := range graph.NodesOf(g.From(w.ID())){
+		for _, node := range Union(graph.NodesOf(g.From(w.ID())),graph.NodesOf(g.To(w.ID()))){
 			if Contains(cluster,node){
 				return true;
 			}
@@ -100,21 +100,23 @@ func DetectCycle(u graph.Node, v graph.Node, g *pkggraph.PkgGraph, leader map[gr
 				if !visited[node] {
 				q = append(q, node)
 				visited[node] = true
+				} else {
+					return true
 				}
 			}
 		}
-		for _, node := range graph.NodesOf(g.To(w.ID())) {
-			if Contains(cluster,node){
-				return true;
-			}
-			if (int64(math.Abs(float64(top[node]-t)))<=1){
-				if visited[node] {
-					return true;
-				}
-				q = append(q, node)
-				visited[node] = true
-			}
-		}
+		// for _, node := range graph.NodesOf(g.To(w.ID())) {
+		// 	if Contains(cluster,node){
+		// 		return true;
+		// 	}
+		// 	if (int64(math.Abs(float64(top[node]-t)))<=1){
+		// 		if visited[node] {
+		// 			return true;
+		// 		}
+		// 		q = append(q, node)
+		// 		visited[node] = true
+		// 	}
+		// }
 	}
 	return false;
 }
@@ -143,10 +145,10 @@ func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 				if (markup[v]){
 					continue
 				}
-				if (DetectCycle(u, v, g, leader, top)){
-					// fmt.Printf("Cycle From")
-					continue
-				}
+				// if (DetectCycle(u, v, g, leader, top)){
+				// 	// fmt.Printf("Cycle From")
+				// 	continue
+				// }
 				leader[u]=leader[v]
 				markup[u]=true
 				markdown[v]=true
@@ -155,10 +157,10 @@ func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 				if (markdown[v]){
 					continue
 				}
-				if (DetectCycle(u, v, g, leader, top)){
-					// fmt.Printf("Cycle to")
-					continue
-				}
+				// if (DetectCycle(u, v, g, leader, top)){
+				// 	// fmt.Printf("Cycle to")
+				// 	continue
+				// }
 				leader[u]=leader[v]
 				markdown[u]=true
 				markup[v]=true
