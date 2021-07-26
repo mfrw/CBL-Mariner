@@ -2,23 +2,18 @@ package clusterise
 
 import (
 	"math"
-	// "reflect"
 	"fmt"
 	"gonum.org/v1/gonum/graph"
-	// "gonum.org/v1/gonum/graph/simple"
-	// "gonum.org/v1/gonum/graph/traverse"
 	"gonum.org/v1/gonum/graph/path"
 	"microsoft.com/pkggen/internal/pkggraph"
 )
 
 func ShortestPath(g *pkggraph.PkgGraph,u graph.Node,v graph.Node) int64 {
-	// fmt.Printf("Inside Shortest path")
 	lol:= graph.Graph(g)
 	paths:= path.DijkstraFrom(u, lol)
 	return int64(paths.WeightTo(v.ID()))
 }
 func Union(a, b []graph.Node) []graph.Node{
-	// fmt.Println("Inside Union")
 	m := make(map[graph.Node]bool)
 
 	for _, item := range a {
@@ -34,22 +29,17 @@ func Union(a, b []graph.Node) []graph.Node{
 }
 
 func CompTopLevels(g *pkggraph.PkgGraph) map[graph.Node]int64{
-	// fmt.Println("Inside Comp Top Levels")
 	top:= make(map[graph.Node]int64)
 	V:= g.AllNodes()
-	// fmt.Println(len(V))
 	var source graph.Node
 	for i, u := range V{
-		//Fn or test to see if it works, Simple fn to check array equal
 		D:=V
 		D=append(D[:i], D[i+1:]...)
-		// fmt.Println(D)
 		if (graph.NodesOf(g.To(u.ID()))==nil){
 			source = u
 			break
 		}
 	}
-	// fmt.Println(source)
 	for _,u := range V{
 		dist := ShortestPath(g,source,u)
 		fmt.Println(u, dist)
@@ -105,18 +95,6 @@ func DetectCycle(u graph.Node, v graph.Node, g *pkggraph.PkgGraph, leader map[gr
 				}
 			}
 		}
-		// for _, node := range graph.NodesOf(g.To(w.ID())) {
-		// 	if Contains(cluster,node){
-		// 		return true;
-		// 	}
-		// 	if (int64(math.Abs(float64(top[node]-t)))<=1){
-		// 		if visited[node] {
-		// 			return true;
-		// 		}
-		// 		q = append(q, node)
-		// 		visited[node] = true
-		// 	}
-		// }
 	}
 	return false;
 }
@@ -145,10 +123,6 @@ func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 				if (markup[v]){
 					continue
 				}
-				// if (DetectCycle(u, v, g, leader, top)){
-				// 	// fmt.Printf("Cycle From")
-				// 	continue
-				// }
 				leader[u]=leader[v]
 				markup[u]=true
 				markdown[v]=true
@@ -157,10 +131,6 @@ func Clusterise(g *pkggraph.PkgGraph) map[graph.Node]graph.Node {
 				if (markdown[v]){
 					continue
 				}
-				// if (DetectCycle(u, v, g, leader, top)){
-				// 	// fmt.Printf("Cycle to")
-				// 	continue
-				// }
 				leader[u]=leader[v]
 				markdown[u]=true
 				markup[v]=true

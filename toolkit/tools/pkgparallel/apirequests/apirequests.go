@@ -12,11 +12,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	// "go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-//Why this driver
-// add BSON tag
 type Pkg struct {
 	PkgID      string `json:"PkgID" bson:"PkgID"`
 	StatusCode string `json:"StatusCode" bson:"StatusCode"`
@@ -66,19 +63,6 @@ func connect() *mongo.Collection {
 	return collection
 }
 
-// func CloseClientDB(*mongo.Client) {
-//     if client == nil {
-//         return
-//     }
-
-//     err := client.Disconnect(context.TODO())
-//     if err != nil {
-//         log.Fatal(err)
-//     }
-
-//     // TODO optional you can log your closed MongoDB client
-//     fmt.Println("Connection to MongoDB closed.")
-// }
 type ErrorResponse struct {
 	StatusCode   int    `json:"status"`
 	ErrorMessage string `json:"message"`
@@ -142,7 +126,7 @@ func (m *mgoClient) returnAllPkgs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(books)
-	// collection.close()
+	
 
 }
 
@@ -156,7 +140,7 @@ func (m *mgoClient) returnSinglePkgs(w http.ResponseWriter, r *http.Request) {
 
 	// string to primitive.ObjectID
 	PkgID, _ := params["id"]
-	// fmt.Println(params, PkgID)
+	
 
 	// We create filter. If it is unnecessary to sort data for you, you can use bson.M{}
 	filter := bson.M{"PkgID": PkgID}
@@ -269,9 +253,5 @@ func handleRequests() {
 }
 
 func main() {
-	Pkgs = []Pkg{
-		Pkg{PkgID: "1", StatusCode: "Building", Location: "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/pk1"},
-		Pkg{PkgID: "2", StatusCode: "Built", Location: "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/threads/pkgloc/pk2"},
-	}
 	handleRequests()
 }

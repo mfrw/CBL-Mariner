@@ -3,15 +3,16 @@ package main
 import (
 	"fmt"
 	"log"
-	"gonum.org/v1/gonum/graph"
+	// "gonum.org/v1/gonum/graph"
 	"microsoft.com/pkggen/internal/logger"
+	// "microsoft.com/pkggen/internal/rpm"
 	"microsoft.com/pkggen/internal/pkggraph"
-	clusterise "microsoft.com/pkggen/pkgparallel/clustering"
+	// clusterise "microsoft.com/pkggen/pkgparallel/clustering"
 	// "bytes"
 	// "encoding/json"
 	// "net/http"
 	// "strconv"
-	// "os/exec"
+	"os/exec"
 	// "os"
 	// "crypto/tls"
 )
@@ -37,9 +38,9 @@ func main() {
 	// 	}
 	// }
 	// os.Chdir("/home/rakshaa/CBL-Mariner/toolkit")
-	// command:= "REBUILD_TOOLS=y"
-	// cmd := exec.Command("sudo", "make", "toolchain", command)
-	// out, err := cmd.Output()
+	command:= "/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/flex-2.6.4-6.cm1.src.rpm"
+	cmd := exec.Command("sudo", "rpmbuild", "-rc", command, "--rebuild", "--nodeps")
+	out, err := cmd.Output()
 
 	// cmd.Stderr = os.Stderr
 	// cmd.Stdin = os.Stdin
@@ -50,30 +51,30 @@ func main() {
 	// cmd.Stdin = os.Stdin
 
 	// out, err := cmd.Output()
-	// if err != nil {
-	// 	fmt.Println("Err", err)
-	// } else {
-	// 	fmt.Println("OUT:", string(out))
-	// }
-	
+	if err != nil {
+		fmt.Println("Err", err)
+		
+	} else{
+		fmt.Println("OUT:", string(out))
+	}
 	logger.InitBestEffort("/tmp/somelog", "INFO")
-	file := "/home/rakshaa/CBL-Mariner/toolkit/tools/pkgparallel/files/reverse-cdrkit.dot"
+	file := "/home/rakshaa/CBL-Mariner/toolkit/tools/depsearch/flex.dot"
 	g := pkggraph.NewPkgGraph()
-	err := pkggraph.ReadDOTGraphFile(g, file)
+	err = pkggraph.ReadDOTGraphFile(g, file)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// fmt.Println(graph.NodesOf(g.From(2)))
-	leader:= clusterise.Clusterise(g)
-	fmt.Println(leader[15])
-	lists := make(map[graph.Node][]graph.Node)
-	for key, element := range leader {
-		lists[element] = append(lists[element], key)
-	}
-	for _, value := range lists {
-		fmt.Println(len(value))
-		// fmt.Println(value)
-	}
+	// // fmt.Println(graph.NodesOf(g.From(2)))
+	// leader:= clusterise.Clusterise(g)
+	// // fmt.Println(leader[15])
+	// lists := make(map[graph.Node][]graph.Node)
+	// for key, element := range leader {
+	// 	lists[element] = append(lists[element], key)
+	// }
+	// for _, value := range lists {
+	// 	fmt.Println(len(value))
+	// 	// fmt.Println(value)
+	// }
 	// tr := &http.Transport{
     //     TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
     // }
@@ -101,7 +102,13 @@ func main() {
     // var res map[string]interface{}
 
     // json.NewDecoder(resp.Body).Decode(&res)
-
+	// file= "/home/rakshaa/CBL-Mariner/build/INTERMEDIATE_SRPMS/flex-2.6.4-6.cm1.src.rpm"
+	// defines:= rpm.DefaultDefines()
+	// defines[rpm.DistTagDefine] = ".cm1"
+	// defines[rpm.DistroReleaseVersionDefine] = "1.0.20210721.1210"
+	// defines[rpm.DistroBuildNumberDefine] = "75b97587"
+	// err= rpm.BuildRPMFromSRPM(file,defines)
+	// fmt.Println(err)
     // fmt.Println(res)
 	// defer req.Body.Close()
 }
