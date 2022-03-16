@@ -17,8 +17,8 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/ulikunitz/xz v0.5.10
-	golang.org/x/sys v0.0.0-20210304124612-50617c2ba197
-	gonum.org/v1/gonum v0.9.3
+	golang.org/x/sys v0.0.0-20211019181941-9d821ace8654
+	gonum.org/v1/gonum v0.11.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 )
