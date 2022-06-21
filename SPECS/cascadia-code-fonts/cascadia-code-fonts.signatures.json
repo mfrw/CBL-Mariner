@@ -1,0 +1,14 @@
+{
+ "Signatures": {
+  "v2111.01.tar.gz": "fb1859ca3f475e5c5510a69824eeb4622a04d8733b3a26d9de58ae26162ad5b9",
+  "CascadiaCode-2111.01.zip": "51fd68176dffb87e2fbc79381aef7f5c9488b58918dee223cd7439b5aa14e712",
+  "cascadia-mono-pl.metainfo.xml": "dc5070710970741ba6eeda67f11bd06889f60865a8204bd37e72fd7a0d09a5da",
+  "cascadia-mono.metainfo.xml": "0dfc14d42c74c16a5c3748863283d965379c9c03661a457c108c7232db123fc1",
+  "cascadia-code-pl.metainfo.xml": "cfd90b679569eb22cf3d5bdea1796a7eb19bad259f39d5265811744991febf0e",
+  "cascadia-code.metainfo.xml": "712ceb65ae5fe3f8f642c864fa322c7a9ef4f05004a306e790c9f18032ee6a1b",
+  "60-cascadia-mono-pl-fonts.conf": "e622b98aad089e16c2c9347f79f8a31c6b6654cd762562d7247bc20742719271",
+  "60-cascadia-code-pl-fonts.conf": "27e1234c1d188fb66bd083f0d1d310cad7cfc535f4a475ce9ec7f384a564b0d5",
+  "60-cascadia-code-fonts.conf": "cac8418457c9ea8a178c2746036aca610c42852b915b8288920154980f0252a9",
+  "57-cascadia-mono-fonts.conf": "2a0041142aac2aaa17f2fcb3d604d3d41bc6710a921838a0352768e53904c776"
+ }
+}

@@ -1,0 +1,25 @@
+diff -Nru lxde-common-0.5.0.orig//openbox/rc.xml.in lxde-common-0.5.0/openbox/rc.xml.in
+--- lxde-common-0.5.0.orig//openbox/rc.xml.in	2008-04-26 04:32:26.000000000 +0200
++++ lxde-common-0.5.0/openbox/rc.xml.in	2011-02-04 03:03:23.000000000 +0100
+@@ -726,6 +726,21 @@
+ 
+   # end of the example
+ -->
++
++<!-- matchbox-keyboard -->
++  <application name="">
++    <decor>no</decor>
++    <fullscreen>no</fullscreen>
++    <maximized>Horizontal</maximized>
++    <position force="yes">
++      <x>0</x>
++      <y>-0</y>
++    </position>
++    <layer>above</layer>
++    <skip_pager>yes</skip_pager>
++    <skip_taskbar>yes</skip_taskbar>
++  </application>
++
+ </applications>
+ 
+ </openbox_config>

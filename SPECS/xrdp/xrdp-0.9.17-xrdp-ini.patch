@@ -1,0 +1,70 @@
+diff -ruN xrdp-0.9.17-v/xrdp/xrdp.ini xrdp-0.9.17/xrdp/xrdp.ini
+--- xrdp-0.9.17-v/xrdp/xrdp.ini	2021-09-01 11:32:12.000000000 +1000
++++ xrdp-0.9.17/xrdp/xrdp.ini	2021-09-01 13:06:55.525816406 +1000
+@@ -203,14 +203,14 @@
+ ; Some session types such as Xorg, X11rdp and Xvnc start a display server.
+ ; Startup command-line parameters for the display server are configured
+ ; in sesman.ini. See and configure also sesman.ini.
+-[Xorg]
+-name=Xorg
+-lib=libxup.so
+-username=ask
+-password=ask
+-ip=127.0.0.1
+-port=-1
+-code=20
++#[Xorg]
++#name=Xorg
++#lib=libxup.so
++#username=ask
++#password=ask
++#ip=127.0.0.1
++#port=-1
++#code=20
+ 
+ [Xvnc]
+ name=Xvnc
+@@ -232,13 +232,13 @@
+ ; Generic VNC Proxy
+ ; Tailor this to specific hosts and VNC instances by specifying an ip
+ ; and port and setting a suitable name.
+-[vnc-any]
+-name=vnc-any
+-lib=libvnc.so
+-ip=ask
+-port=ask5900
+-username=na
+-password=ask
++#[vnc-any]
++#name=vnc-any
++#lib=libvnc.so
++#ip=ask
++#port=ask5900
++#username=na
++#password=ask
+ #pamusername=asksame
+ #pampassword=asksame
+ #pamsessionmng=127.0.0.1
+@@ -247,15 +247,15 @@
+ ; Generic RDP proxy using NeutrinoRDP
+ ; Tailor this to specific hosts by specifying an ip and port and setting
+ ; a suitable name.
+-[neutrinordp-any]
+-name=neutrinordp-any
++#[neutrinordp-any]
++#name=neutrinordp-any
+ ; To use this section, you should build xrdp with configure option
+ ; --enable-neutrinordp.
+-lib=libxrdpneutrinordp.so
+-ip=ask
+-port=ask3389
+-username=ask
+-password=ask
++#lib=libxrdpneutrinordp.so
++#ip=ask
++#port=ask3389
++#username=ask
++#password=ask
+ ; Uncomment the following lines to enable PAM authentication for proxy
+ ; connections.
+ #pamusername=ask

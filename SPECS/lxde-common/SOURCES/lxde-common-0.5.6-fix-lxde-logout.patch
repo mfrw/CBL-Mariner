@@ -1,0 +1,26 @@
+From 938501a0e801216e09e21e3401f12eb77ee59a1e Mon Sep 17 00:00:00 2001
+From: Andriy Grytsenko <andrej@rep.kiev.ua>
+Date: Mon, 1 Sep 2014 19:39:53 +0300
+Subject: [PATCH] [SF#399]Fix missing install of lxde-logout.desktop file.
+
+---
+ Makefile.am |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Makefile.am b/Makefile.am
+index 00a0401..4c81e5e 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -9,6 +9,9 @@ xsession_DATA = LXDE.desktop
+ defaultsdir=$(sysconfdir)/xdg/lxsession/LXDE
+ defaults_DATA = autostart desktop.conf
+ 
++lxlogoutdir=$(datadir)/applications/
++lxlogout_DATA=lxde-logout.desktop
++
+ wallpapersdir=$(datadir)/lxde/wallpapers
+ wallpapers_DATA= \
+ 	wallpapers/lxde_blue.jpg \
+-- 
+1.7.10.4
+

@@ -1,0 +1,10 @@
+{
+ "Signatures": {
+  "azuremariner-default.jpg": "0a3005addf578c3fa3b4e10aaadabaeab4283b454520e06a41da1eedf74f35a0",
+  "azuremariner.png": "3e7b59df6d3725db10257701c8581d5818909f8ca1acffff641b6fdb950e790a",
+  "greeter.ui": "7fb47d0a464e08c13c60c3dfb3a5a144ca9cdb0be5a3e884d94704ec2bfaa34c",
+  "lxdm-0.5.3.tar.xz": "4891efee81c72a400cc6703e40aa76f3f3853833d048b72ec805da0f93567f2f",
+  "lxdm.conf": "1ca615cc507a442ac51d1aef0d13ee0d3e1e2d50384a93e49d06637bd82129c6",
+  "lxdm.service": "a40507cc39847b071f0adea65dada15a3e4024746fb4fb0a0ee5ce420af815aa"
+ }
+}

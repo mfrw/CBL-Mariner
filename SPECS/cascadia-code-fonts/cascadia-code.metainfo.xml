@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2019 Tom Callaway <spot@fedoraproject.org> -->
+<component type="font">
+  <id>cascadia-code</id>
+  <metadata_license>CC-BY-4.0</metadata_license>
+  <name>Cascadia Code</name>
+  <summary>A monospaced font</summary>
+  <description>
+    <p>
+       Cascadia Code is a monospaced font designed to provide a fresh experience for
+       command line experiences and code editors. Notably, it supports programming
+       ligatures.
+    </p>
+  </description>
+  <updatecontact>spot_at_fedoraproject_dot_org</updatecontact>
+  <url type="homepage">https://github.com/microsoft/cascadia-code/</url>
+</component>

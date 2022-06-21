@@ -1,0 +1,12 @@
+diff -ruN xrdp-0.9.9-v/sesman/sesman.ini xrdp-0.9.9/sesman/sesman.ini
+--- xrdp-0.9.9-v/sesman/sesman.ini	2018-12-25 15:49:32.000000000 +1100
++++ xrdp-0.9.9/sesman/sesman.ini	2019-01-11 19:19:42.253947862 +1100
+@@ -7,7 +7,7 @@
+ ; Give in relative path to user's home directory
+ UserWindowManager=startwm.sh
+ ; Give in full path or relative path to /etc/xrdp
+-DefaultWindowManager=startwm.sh
++DefaultWindowManager=startwm-bash.sh
+ ; Give in full path or relative path to /etc/xrdp
+ ReconnectScript=reconnectwm.sh
+ 

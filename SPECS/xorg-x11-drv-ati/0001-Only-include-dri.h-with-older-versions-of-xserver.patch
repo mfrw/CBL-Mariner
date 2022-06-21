@@ -1,0 +1,33 @@
+From c52d7107852db3ac6940a7dd4c0b64964eaa140c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Michel=20D=C3=A4nzer?= <mdaenzer@redhat.com>
+Date: Tue, 2 Feb 2021 12:45:54 +0100
+Subject: [PATCH xf86-video-ati] Only include dri.h with older versions of
+ xserver
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Not needed anymore with current versions.
+
+Signed-off-by: Michel Dänzer <mdaenzer@redhat.com>
+---
+ src/drmmode_display.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/drmmode_display.c b/src/drmmode_display.c
+index 3099a729b3..a58f24dd43 100644
+--- a/src/drmmode_display.c
++++ b/src/drmmode_display.c
+@@ -45,7 +45,9 @@
+ #include "radeon_glamor.h"
+ #include "radeon_reg.h"
+ 
++#if XORG_VERSION_CURRENT < XORG_VERSION_NUMERIC(1,19,99,1,0)
+ #include <dri.h>
++#endif
+ 
+ #include "drmmode_display.h"
+ 
+-- 
+2.31.0
+

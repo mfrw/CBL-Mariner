@@ -1,0 +1,19 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Web Browser
+Name[it]=Browser Web
+GenericName=Web Browser
+GenericName[it]=Browser Web
+X-GNOME-Fullname=Default Web Browser
+X-GNOME-Fullname=Browser Web predefinito
+Comment=Browse the Web
+Comment[it]=Naviga nel Web
+X-GNOME-Keywords=Internet;WWW;Explorer
+X-AppInstall-Keywords=Internet;WWW;Explorer
+Categories=GTK;Network;WebBrowser;
+MimeType=text/html;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/geo;image/svg+xml;
+Exec= xdg-open http:// %U
+Icon=web-browser
+Terminal=false
+StartupNotify=true

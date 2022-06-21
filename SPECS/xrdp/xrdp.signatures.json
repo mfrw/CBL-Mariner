@@ -1,0 +1,12 @@
+{
+ "Signatures": {
+  "xrdp-0.9.18.tar.gz": "c5eea0af055fac90c632e44fb667f1a25c55de2e34b37127e4cb0aabaef90a0f",
+  "xrdp-sesman.pamd": "ce865cce8da0a4b9a0184a231a7d32875302247817861c57f88e18076b577b4b",
+  "xrdp-polkit-1.rules": "314bf478da123f3e4d1b422e93058a0b9be0b479613eff21b857ac6126a6c8ba",
+  "xrdp.te": "1bc1a6f4fcb8f821d728063efa250e1f7156e2f31cf7d14724f58844e9999c45",
+  "xrdp.sysconfig": "09229769640f5615c706015ea91d76d9572883195742958054e96b76ead8795d",
+  "xrdp.logrotate": "1958ff09ed169faff024681a4ecaf7f8a4fab8c2125cc7b5173fb526f46b60ec",
+  "README.Fedora": "78f8c74fedc398291a0e6cc169e09dad224ad350cdefeb601d14bd8033e80d06",
+  "openssl.conf": "41747e52be9e80c90e0dc82f5db41eb0f236dd020566022d82ebbdf5cf1c3771"
+ }
+}

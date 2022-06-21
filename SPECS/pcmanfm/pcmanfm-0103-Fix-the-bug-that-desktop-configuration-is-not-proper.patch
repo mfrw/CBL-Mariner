@@ -1,0 +1,26 @@
+From 332c919a425092acc0e2fc53f1fc60e7540a8497 Mon Sep 17 00:00:00 2001
+From: Mamoru TASAKA <mtasaka@fedoraproject.org>
+Date: Wed, 7 Feb 2018 23:54:24 +0900
+Subject: [PATCH 103/104] Fix the bug that desktop configuration is not
+ properly saved
+
+idle_config_save must be reset on fm_desktop_manager_finalize
+---
+ src/desktop.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/desktop.c b/src/desktop.c
+index b6fc680..5fb65e1 100644
+--- a/src/desktop.c
++++ b/src/desktop.c
+@@ -457,6 +457,7 @@ static void save_item_pos(FmDesktop* desktop)
+ static gboolean on_config_save_idle(gpointer _unused)
+ {
+     int screen;
++    idle_config_save = 0;
+ 
+     if (g_source_is_destroyed(g_main_current_source()))
+         return FALSE;
+-- 
+2.16.1
+

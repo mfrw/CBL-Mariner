@@ -1,0 +1,59 @@
+diff -Nru alsa-plugins-1.0.23.orig//jack/pcm_jack.c alsa-plugins-1.0.23/jack/pcm_jack.c
+--- alsa-plugins-1.0.23.orig//jack/pcm_jack.c	2010-04-16 13:11:10.000000000 +0200
++++ alsa-plugins-1.0.23/jack/pcm_jack.c	2010-12-13 22:21:56.985418598 +0100
+@@ -315,7 +315,6 @@
+ 	snd_pcm_jack_t *jack;
+ 	int err;
+ 	int fd[2];
+-	static unsigned int num = 0;
+ 	char jack_client_name[32];
+ 	
+ 	assert(pcmp);
+@@ -341,14 +340,14 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	if (snprintf(jack_client_name, sizeof(jack_client_name), "alsa-jack.%s%s.%d.%d", name,
+-		     stream == SND_PCM_STREAM_PLAYBACK ? "P" : "C", getpid(), num++)
++	if (snprintf(jack_client_name, sizeof(jack_client_name), "%s_%s", name,
++		     stream == SND_PCM_STREAM_PLAYBACK ? "P" : "C" )
+ 	    >= (int)sizeof(jack_client_name)) {
+ 		fprintf(stderr, "%s: WARNING: JACK client name '%s' truncated to %d characters, might not be unique\n",
+ 			__func__, jack_client_name, (int)strlen(jack_client_name));
+ 	}
+ 
+-	jack->client = jack_client_new(jack_client_name);
++	jack->client = jack_client_open(jack_client_name, JackNullOption, NULL);
+ 
+ 	if (jack->client == 0) {
+ 		snd_pcm_jack_free(jack);
+@@ -364,6 +363,7 @@
+ 	socketpair(AF_LOCAL, SOCK_STREAM, 0, fd);
+ 	
+ 	jack->fd = fd[0];
++	fcntl( jack->fd, F_SETFL, O_NONBLOCK );
+ 
+ 	jack->io.version = SND_PCM_IOPLUG_VERSION;
+ 	jack->io.name = "ALSA <-> JACK PCM I/O Plugin";
+@@ -397,6 +397,7 @@
+ 	snd_config_t *playback_conf = NULL;
+ 	snd_config_t *capture_conf = NULL;
+ 	int err;
++	(void) root;
+ 	
+ 	snd_config_for_each(i, next, conf) {
+ 		snd_config_t *n = snd_config_iterator_entry(i);
+@@ -405,6 +406,13 @@
+ 			continue;
+ 		if (strcmp(id, "comment") == 0 || strcmp(id, "type") == 0 || strcmp(id, "hint") == 0)
+ 			continue;
++		if (strcmp(id, "client_name") == 0) {
++			const char *jack_name;
++			if (snd_config_get_string(n, &jack_name) < 0)
++				continue;
++			name = strdup(jack_name);
++			continue;
++		}
+ 		if (strcmp(id, "playback_ports") == 0) {
+ 			if (snd_config_get_type(n) != SND_CONFIG_TYPE_COMPOUND) {
+ 				SNDERR("Invalid type for %s", id);

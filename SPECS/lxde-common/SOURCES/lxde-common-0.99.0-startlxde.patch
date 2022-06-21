@@ -1,0 +1,22 @@
+diff -Nru lxde-common-0.5.5.orig/startlxde.in lxde-common-0.5.5/startlxde.in
+--- lxde-common-0.5.5.orig/startlxde.in	2014-05-11 21:21:14.751224844 +0000
++++ lxde-common-0.5.5/startlxde.in	2014-05-11 21:25:03.632958603 +0000
+@@ -44,5 +44,18 @@
+ eval `@prefix@/bin/dbus-launch --sh-syntax --exit-with-session </dev/null`
+ fi
+ 
++# Launch notification-daemon
++if [ -x @libexecdir@/notification-daemon ]; then
++   @libexecdir@/notification-daemon &
++fi
++
++# set profile and xprofile
++if [ -r /etc/profile ]; then
++   . /etc/profile
++fi
++if [ -r /etc/xprofile ]; then
++   . /etc/xprofile
++fi
++
+ # Start the LXDE session
+ exec @prefix@/bin/lxsession -s LXDE -e LXDE

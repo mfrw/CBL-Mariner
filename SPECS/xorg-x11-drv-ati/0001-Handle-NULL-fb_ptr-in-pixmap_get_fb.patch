@@ -1,0 +1,33 @@
+From 4d84cf438e7f1bebf0053035ef0292e9fed257d1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Michel=20D=C3=A4nzer?= <mdaenzer@redhat.com>
+Date: Fri, 29 Nov 2019 16:37:32 +0100
+Subject: [PATCH 1/2] Handle NULL fb_ptr in pixmap_get_fb
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This can happen when HW acceleration is disabled.
+
+Fixes https://gitlab.freedesktop.org/xorg/driver/xf86-video-ati/issues/188
+
+Signed-off-by: Michel Dänzer <mdaenzer@redhat.com>
+---
+ src/radeon.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/radeon.h b/src/radeon.h
+index 2c913466..8e964805 100644
+--- a/src/radeon.h
++++ b/src/radeon.h
+@@ -896,7 +896,7 @@ radeon_pixmap_get_fb(PixmapPtr pix)
+ 				   handle);
+     }
+ 
+-    return *fb_ptr;
++    return fb_ptr ? *fb_ptr : NULL;
+ }
+ 
+ 
+-- 
+2.26.2
+

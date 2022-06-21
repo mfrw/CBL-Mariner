@@ -1,0 +1,12 @@
+{
+ "Signatures": {
+  "default.pa-for-gdm": "0ab5d17a9fb75c082eb0c84703747e7bd082369a73d1e40d0f0cfe1c4f399ecd",
+  "disable_flat_volumes.conf": "8dc26fc48cac18d81d00601896a7c124bbfa95294f630b148fe7e0d1db770928",
+  "pulseaudio-12.2.tar.xz": "809668ffc296043779c984f53461c2b3987a45b7a25eb2f0a1d11d9f23ba4055",
+  "pulseaudio-server.fw": "6d59a490eef92c8cd96dbe236042f399c6db5dd4f39bf2836b6b4d00e3fdbb35",
+  "pulseaudio.service": "f21f2adc3919a87c399e55e1efd70142c865ee0c2e6a6556ee899fcabfb1f30c",
+  "pulseaudio.tmpfiles": "ab75062b874aa2b8cdabe8963c58e294784cd75027f75b533de3558dce51ea80",
+  "setup-pulseaudio": "04c471c68d36c02cb7780c0552846639471bf96f05f7c9aaf4be1046e96d33de",
+  "sysconfig.sound-pulseaudio": "c6b6cdba60ee872d803b1fadd2749338af1821d5df922a19ec961ce302112d62"
+ }
+}

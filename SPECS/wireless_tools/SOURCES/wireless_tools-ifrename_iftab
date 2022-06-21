@@ -1,0 +1,6 @@
+#
+# Interface naming configuration file for ifrename
+# For more informations see the manpage ifrename(8)
+
+# The following line renames firewire network interfaces to fire*
+fire* driver eth1394

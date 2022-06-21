@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2020 Tom Callaway <spot@fedoraproject.org> -->
+<component type="font">
+  <id>cascadia-mono-pl</id>
+  <metadata_license>CC-BY-4.0</metadata_license>
+  <name>Cascadia Mono PL</name>
+  <summary>A monospaced font with powerline symbols</summary>
+  <description>
+    <p>
+       The Cascadia Mono PL font family is a variant of Cascadia Code. Cascadia Mono PL
+       does not include the programming ligatures that Cascadia Code has, but does include
+       powerline symbols.
+    </p>
+  </description>
+  <updatecontact>spot_at_fedoraproject_dot_org</updatecontact>
+  <url type="homepage">https://github.com/microsoft/cascadia-code/</url>
+</component>

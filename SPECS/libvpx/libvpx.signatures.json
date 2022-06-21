@@ -1,0 +1,7 @@
+{
+ "Signatures": {
+  "v1.11.0.tar.gz": "965e51c91ad9851e2337aebcc0f517440c637c506f3a03948062e3d5ea129a83",
+  "vpx_config.h": "96ad7a0b3eb887e18d7046d855fdbf9c7c401e8c28ca4dab656e623806fb89de",
+  "libvpx.ver": "784ac8eec65da1de51a59c0b7ee0e33a7d1887318c831f5ee970b71144951865"
+ }
+}

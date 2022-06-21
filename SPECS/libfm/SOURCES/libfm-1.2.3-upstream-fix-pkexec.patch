@@ -1,0 +1,69 @@
+From fad5a9a3e3a3148d1275b7ba048614aa4c7c0414 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Lu=C3=ADs=20Pereira?= <luis.artur.pereira@gmail.com>
+Date: Thu, 7 May 2015 21:57:42 +0300
+Subject: [PATCH] Use G_SPAWN_DO_NOT_REAP_CHILD on application launch, that
+ should fix a problem with pkexec.
+
+---
+ NEWS                   |  3 +++
+ src/base/fm-app-info.c | 19 ++++++++++++++++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/NEWS b/NEWS
+index 60d70a1..964fd67 100644
+--- a/NEWS
++++ b/NEWS
+@@ -6,6 +6,9 @@
+ 
+ * Fixed missing folder info update on folder attributes change.
+ 
++* Use G_SPAWN_DO_NOT_REAP_CHILD on application launch, that should fix
++    a problem with pkexec.
++
+ 
+ Changes on 1.2.3 since 1.2.2:
+ 
+diff --git a/src/base/fm-app-info.c b/src/base/fm-app-info.c
+index c374982..5bd4433 100644
+--- a/src/base/fm-app-info.c
++++ b/src/base/fm-app-info.c
+@@ -204,6 +204,15 @@ static void child_setup(gpointer user_data)
+     setpgid(0, data->pgid);
+ }
+ 
++static void child_watch(GPid pid, gint status, gpointer user_data)
++{
++    /*
++     * Ensure that we don't double fork and break pkexec
++     */
++    g_spawn_close_pid(pid);
++}
++
++
+ static char* expand_terminal(char* cmd, gboolean keep_open, GError** error)
+ {
+     FmTerminal* term;
+@@ -246,6 +255,7 @@ static gboolean do_launch(GAppInfo* appinfo, const char* full_desktop_path,
+     int argc;
+     gboolean use_terminal;
+     GAppInfoCreateFlags flags;
++    GPid pid;
+ 
+     cmd = expand_exec_macros(appinfo, full_desktop_path, kf, inp, &gfiles);
+     if(G_LIKELY(kf))
+@@ -315,9 +325,12 @@ static gboolean do_launch(GAppInfo* appinfo, const char* full_desktop_path,
+ 
+         data.pgid = getpgid(getppid());
+         ret = g_spawn_async(path, argv, NULL,
+-                            G_SPAWN_SEARCH_PATH,
+-                            child_setup, &data, NULL, err);
+-        if (!ret && data.sn_id)
++                            G_SPAWN_SEARCH_PATH | G_SPAWN_DO_NOT_REAP_CHILD,
++                            child_setup, &data, &pid, err);
++        if (ret)
++            /* Ensure that we don't double fork and break pkexec */
++            g_child_watch_add(pid, child_watch, NULL);
++        else if (data.sn_id)
+             /* Notify launch context about failure */
+             g_app_launch_context_launch_failed(ctx, data.sn_id);
+ 

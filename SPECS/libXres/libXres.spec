@@ -1,0 +1,46 @@
+Summary:	X11 libXres runtime library.
+Name:		libXres
+Version:	1.0.7
+Release:	2%{?dist}
+License:	MIT
+URL:		http://www.x.org/
+Group:		System Environment/Libraries
+Vendor:		Microsoft Corporation
+Distribution:	Mariner
+Source0:	ftp://ftp.x.org/pub/individual/lib/%{name}-%{version}.tar.bz2
+%define sha1 libXres=45e09c6b771af5d8c448ce31de65d15bf83b7579
+BuildRequires:	libXext-devel
+Requires:	libXext
+%description
+The X11 Resource extension library.
+%package	devel
+Summary:	Header and development files
+Requires:	%{name} = %{version}
+Requires:	libXext-devel
+%description	devel
+It contains the libraries and header files to create applications
+%prep
+%setup -q
+%build
+./configure --prefix=%{_prefix}
+make %{?_smp_mflags}
+%install
+make DESTDIR=%{buildroot} install
+%files
+%defattr(-,root,root)
+%{_libdir}/*
+%exclude %{_libdir}/debug/
+%exclude %{_libdir}/*.a
+%exclude %{_libdir}/*.la
+%files devel
+%defattr(-,root,root)
+%{_includedir}/*
+%{_libdir}/*.a
+%{_libdir}/*.la
+%{_datadir}/*
+%changelog
+*	Thu Feb 13 2020 Suresh Babu Chalamalasetty <schalam@microsoft.com> 1.0.7-2
+-	Mariner initial version
+*	Tue May 19 2015 Alexey Makhalov <amakhalov@vmware.com> 1.0.7-1
+-	initial version
+
