@@ -75,7 +75,7 @@ BuildRequires:  gstreamer-plugins-base-devel
 %{?_with_gss:BuildRequires:  pkgconfig(krb5) >= 1.13}
 BuildRequires:  pkgconfig(libpcsclite)
 BuildRequires:  pkgconfig(libpulse)
-BuildRequires:  pkgconfig(libsystemd)
+#BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libusb-1.0)
 BuildRequires:  pkgconfig(openssl)
 %{?_with_soxr:BuildRequires:  pkgconfig(soxr)}
