@@ -1,0 +1,10 @@
+{
+ "Signatures": {
+  "tigervnc-1.12.0.tar.gz": "9ff3f3948f2a4e8cc06ee598ee4b1096beb62094c13e0b1462bff78587bed789",
+  "xvnc.socket": "b3d60158b0edfe9f1b09be86e4bfda8c2a4a4a6e882382b85dbe81639a3e1f0c",
+  "xvnc.service": "c209eedaec77349d971aa8624dbdf4d018d3ea24912235720e1b8c34a0462952",
+  "vncserver": "3fcacd48bd8ed99f6fe525d6fa02d8d52c0d20c4c91087c08cdfab0482b5466c",
+  "HOWTO.md": "07d5f27c854268c728b65164cd838c6a2341d529b10bc0020ea15f2ccd7ee91c",
+  "10-libvnc.conf": "5bab80ca8c187619332309fd6af3240622e4ec145f4245064b5fa1130abe436b"
+ }
+}

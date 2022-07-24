@@ -1,0 +1,12 @@
+#%PAM-1.0
+# Generic Mariner config
+auth       include      system-auth
+account    include      system-account
+password   include      system-password
+session    include      system-session
+
+# Gnome specific Fedora config
+#auth       include      gdm-password
+#account    include      gdm-password
+#password   include      gdm-password
+#session    include      gdm-password

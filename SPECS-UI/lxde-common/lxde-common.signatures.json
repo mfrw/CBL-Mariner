@@ -1,0 +1,20 @@
+{
+ "Signatures": {
+  "install_microsoft_edge.sh": "a9fb0c66a6c983ca72d84a5c3073c4d456d5059538c003ac8536ce3933926c16",
+  "logout-banner.png": "da183250a1139d7289bff6898a761e5be3ea6c87f52240dce79601a90bc11fb2",
+  "lxde-common-0.99.1.tar.xz": "8ca5ea3185fd3cacc28116cd9adfdc3b1d92a4ff891fccf135d35f0224c29827",
+  "lxde-common-icon-mariner.png": "809a6dfce922739fef90f5f9e77b3c60b1713eae350f679a72acf2b86121baef",
+  "marineros_background-default.jpg": "c61369e185ac1ab98354dace282753046a6ac363fe2b95cec7361f81e577f9fe",
+  "marineros_wallpaper1.jpg": "f6f72ab9e1baa4f7d4ffe9520126d36261a930604a125e875529430255ec4d8d",
+  "marineros_wallpaper10.jpg": "0c5339f19df321311b941b7cc1470ab742b94b297ada07c358a9bfdce9f1a1b6",
+  "marineros_wallpaper2.jpg": "f1a253f363ef99eee3a17a27f879c869269e9339aa5a905a59de6585a0d9816e",
+  "marineros_wallpaper3.jpg": "620ab3f80c60cd927864ecafe75f4a649f312324c45770f95e5333c04d7cc18b",
+  "marineros_wallpaper4.jpg": "761176acc233d20bb033e64c23e6e46efcdabaf591d9e2c393b44cbb7bb060e7",
+  "marineros_wallpaper5.jpg": "ad4a7b89fa6a2c106cf658c6a52bc6da5ffae7c1a947a49ac598426add9d37d0",
+  "marineros_wallpaper6.jpg": "c6671db8ab306fb4955e7c90150f9d09c2c5daf748e6ab6946d95a559c25f94b",
+  "marineros_wallpaper7.jpg": "0cc7696a6d2e142321879b79222e316f50f7b53959d091e80deb604542ef5ead",
+  "marineros_wallpaper8.jpg": "e5110d4722a3b26b0721c225e1c951050ab92948af15058750730bf0d862024a",
+  "marineros_wallpaper9.jpg": "d2d7deca411db60180b3c780db2768817923b4ce67ecd803db7af0e4a97eb342",
+  "background-default.jpg": "e46d280361e9faf4e97a19148476373b4b2a18c62c0d6b9d83f00449ea92516b"
+ }
+}

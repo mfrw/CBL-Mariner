@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2020 Tom Callaway <spot@fedoraproject.org> -->
+<component type="font">
+  <id>cascadia-code-pl</id>
+  <metadata_license>CC-BY-4.0</metadata_license>
+  <name>Cascadia Code PL</name>
+  <summary>A monospaced font</summary>
+  <description>
+    <p>
+       Cascadia Code PL is a monospaced font designed to provide a fresh experience for
+       command line experiences and code editors. Notably, it supports programming
+       ligatures. This variant also includes powerline symbols.
+    </p>
+  </description>
+  <updatecontact>spot_at_fedoraproject_dot_org</updatecontact>
+  <url type="homepage">https://github.com/microsoft/cascadia-code/</url>
+</component>

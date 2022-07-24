@@ -1,0 +1,72 @@
+Restarts
+========
+
+Service restarts after RPM package upgrades have been disabled on purpose.
+This is to avoid a situation where an update is performed from within a
+session running on xrdp, which can then cause dnf to only perform part of the
+transaction and leave the system in a state that requires further manual
+intervention, including removal of duplicate packages etc.
+
+So, it will be up to the user/admin to restart xrdp service after any RPM
+package upgrade. This is in line with what other GUI systems like Xorg and
+Wayland do.
+
+xorgxrdp
+========
+
+Note that xorgxrdp is not installed and configured by default. Each build
+depends on specific binary version of Xorg, which tends to create very strict
+installation dependencies that can be an inconvenience in EPEL.
+
+SELinux
+=======
+
+Please note that you may need to install xrdp-selinux package in order to get
+the required SELinux policy that will allow xrdp and associated processes to
+run successfully if SELinux is enabled. On versions of Fedora and RHEL that
+support weak dependencies, xrdp-selinux will be a recommended package.
+
+WARNING: The policy module contains a rule that permits unconfined_service_t
+processes to transition into unconfined_t. If xrdp is not the only service
+that runs as unconfined_service_t on your system, this policy will allow any
+other such service to transition as well.
+
+Default configuration in /etc/pam.d/xrdp-sesman uses password-auth for auth,
+account, password and session. This may result in an incorrect context for
+the processes in the session. Please adjust this file to match your desktop
+environment. An example for Gnome desktop is given in the file.
+
+TigerVNC >= 1.8.0
+=================
+
+TigerVNC 1.8.0 enables clipboard support by default (i.e. no need to run
+vncconfig), which may cause disconnections in xrdp. To avoid the issue, these
+can be added to [Xvnc] stanza in /etc/xrdp/sesman.ini:
+
+param=-AcceptCutText=0
+param=-SendCutText=0
+param=-SendPrimary=0
+param=-SetPrimary=0
+
+Of course, cut and paste support will not work with these set.
+
+Runlevel
+========
+
+If the system is configured to boot into graphical target, you may experience
+problems with xrdp Gnome sessions. In order to avoid this, put the system into
+multi user target. Like this:
+
+systemctl set-default multi-user.target
+
+Then reboot.
+
+VSOCK
+========
+An example of a how to set up xrdp with VSOCK can be found here:
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1787953#c22
+
+Please note that polkit rules for active sessions, allowing access to colord
+and repository updates are already shipped, but in a current, JavaScript
+format.

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2020 Tom Callaway <spot@fedoraproject.org> -->
+<component type="font">
+  <id>cascadia-mono</id>
+  <metadata_license>CC-BY-4.0</metadata_license>
+  <name>Cascadia Mono</name>
+  <summary>A monospaced font</summary>
+  <description>
+    <p>
+       The Cascadia Mono font family is a variant of Cascadia Code. Cascadia Mono
+       does not include the programming ligatures that Cascadia Code has.	
+    </p>
+  </description>
+  <updatecontact>spot_at_fedoraproject_dot_org</updatecontact>
+  <url type="homepage">https://github.com/microsoft/cascadia-code/</url>
+</component>

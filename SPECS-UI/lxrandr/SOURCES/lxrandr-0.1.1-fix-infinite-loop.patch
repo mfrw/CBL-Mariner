@@ -1,0 +1,21 @@
+--- lxrandr-0.1.1/configure.in.orig	2010-05-15 10:25:12.738528037 +0200
++++ lxrandr-0.1.1/configure.in	2010-05-15 10:30:19.717237592 +0200
+@@ -5,6 +5,9 @@
+ AM_CONFIG_HEADER(config.h)
+ AM_MAINTAINER_MODE
+ 
++# Init intltool
++IT_PROG_INTLTOOL
++
+ AC_ISC_POSIX
+ AC_PROG_CC
+ AM_PROG_CC_STDC
+@@ -27,7 +30,7 @@
+ AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [Gettext package.])
+ 
+ dnl Add the languages which your application supports here.
+-ALL_LINGUAS="af ar cs da de es et eu fa fi fr gl hr hu id it ja ko lt ml ms nb nl nn pl pt pt_BR ru sk sl sv tr uk ur ur_PK vi zh_CN zh_TW"
++ALL_LINGUAS="it"
+ AM_GLIB_GNU_GETTEXT
+ 
+ if test x"$enable_man" = x"yes"; then

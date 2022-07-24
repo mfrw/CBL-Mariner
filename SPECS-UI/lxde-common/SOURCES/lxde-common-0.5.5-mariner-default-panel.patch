@@ -1,0 +1,44 @@
+diff -Nru lxde-common-0.5.5.orig/lxpanel/panel.in lxde-common-0.5.5/lxpanel/panel.in
+--- lxde-common-0.5.5.orig/lxpanel/panel.in	2011-07-29 16:04:03.000000000 +0200
++++ lxde-common-0.5.5/lxpanel/panel.in	2013-05-26 16:29:03.848496322 +0200
+@@ -53,7 +53,7 @@
+             id=pcmanfm.desktop
+         }
+         Button {
+-            id=chromium.desktop
++            id=lxbrowser.desktop
+         }
+     }
+ }
+@@ -110,11 +110,24 @@
+ }
+ 
+ Plugin {
+-    type = netstat
++    type = volumealsa
+ }
+ 
++
+ Plugin {
+-    type = cpu
++    type = batt
++    Config {
++        HideIfNoBattery=0
++        AlarmCommand=xmessage Battery low
++        AlarmTime=5
++        BackgroundColor=black
++        BorderWidth=1
++        ChargingColor1=#28f200
++        ChargingColor2=#22cc00
++        DischargingColor1=#ffee00
++        DischargingColor2=#d9ca00
++        Size=8
++    }
+ }
+ 
+ Plugin {
+@@ -138,4 +151,3 @@
+         }
+     }
+ }
+-

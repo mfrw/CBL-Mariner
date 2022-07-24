@@ -1,0 +1,60 @@
+From 25a85bc3ec664864678d33e4c923b0008384d037 Mon Sep 17 00:00:00 2001
+From: Mamoru TASAKA <mtasaka@fedoraproject.org>
+Date: Tue, 5 May 2020 09:50:37 +0900
+Subject: [PATCH] connect_model: connect to signal before setting folder for
+ model
+
+In connect_model(), when fm_folder_model_new(folder, FALSE) is invoked, in libfm/src/gtk/fm-folder-model.c ,
+*  a new FmFolderModel object *model is created,
+*  and fm_folder_model_set_folder(model, folder) is called internally.
+*  When folder is already loaded, fm_folder_model_set_folder() calls _fm_folder_model_add_file() internally for each file in "Desktop" directory, which calls fm_folder_model_file_created().
+*  fm_folder_model_file_created() calls _fm_folder_model_insert_item(), and
+*  _fm_folder_model_insert_item() calls gtk_tree_model_row_inserted() (for each file in "Desktop" directory), which emits "row-inserted" signal to the created model.
+
+What is the problem here is that this signal is needed for calling on_row_inserted() callback function (in pcmanfm/src/desktop.c),
+*  which calls fm_folder_model_set_item_userdata().
+*  This fm_folder_model_set_item_userdata() call is needed for load_items(), as it tries to call the line:
+```
+   item = fm_folder_model_get_item_userdata(desktop->model, &it);
+```
+   and then it tries to access item->fi.
+
+So with current connect_model() implementation, when folder is already called, on_row_inserted callback function (for "row-inserted" signal) is never called. This causes fm_folder_model_get_item_userdata() return value (in load_itemr) NULL, and it makes segfault when accessing item->fi like https://bugzilla.redhat.com/show_bug.cgi?id=1827445 or so.
+
+So before setting folder for model by fm_folder_model_set_folder(), connecting model to signal from folder is needed beforehand.
+---
+ src/desktop.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/src/desktop.c b/src/desktop.c
+index bea6b82..a066059 100644
+--- a/src/desktop.c
++++ b/src/desktop.c
+@@ -4875,11 +4875,11 @@ static void on_sort_changed(GtkTreeSortable *model, FmDesktop *desktop)
+ 
+ static inline void connect_model(FmDesktop *desktop, FmFolder *folder)
+ {
+-    desktop->model = fm_folder_model_new(folder, FALSE);
++    desktop->model = fm_folder_model_new(NULL, FALSE);
++
+     g_signal_connect(folder, "start-loading", G_CALLBACK(on_folder_start_loading), desktop);
+     g_signal_connect(folder, "finish-loading", G_CALLBACK(on_folder_finish_loading), desktop);
+     g_signal_connect(folder, "error", G_CALLBACK(on_folder_error), desktop);
+-    fm_folder_model_set_icon_size(desktop->model, fm_config->big_icon_size);
+     g_signal_connect(app_config, "changed::big_icon_size",
+                      G_CALLBACK(on_big_icon_size_changed), desktop->model);
+     g_signal_connect(desktop->model, "row-deleting", G_CALLBACK(on_row_deleting), desktop);
+@@ -4887,6 +4887,10 @@ static inline void connect_model(FmDesktop *desktop, FmFolder *folder)
+     g_signal_connect(desktop->model, "row-deleted", G_CALLBACK(on_row_deleted), desktop);
+     g_signal_connect(desktop->model, "row-changed", G_CALLBACK(on_row_changed), desktop);
+     g_signal_connect(desktop->model, "rows-reordered", G_CALLBACK(on_rows_reordered), desktop);
++
++    fm_folder_model_set_folder(desktop->model, folder);
++    fm_folder_model_set_icon_size(desktop->model, fm_config->big_icon_size);
++
+ #if FM_CHECK_VERSION(1, 0, 2)
+     fm_folder_model_set_sort(desktop->model, desktop->conf.desktop_sort_by,
+                              desktop->conf.desktop_sort_type);
+-- 
+2.26.2
+

@@ -1,0 +1,7 @@
+{
+ "Signatures": {
+  "gst-plugins-base-1.20.0.tar.xz": "4cb66fccf730b1037e6533862c2128990912a6db4e5bbd14e0ef914450eb4c7c",
+  "baselibs.conf": "33e00f3f881ba045e9052a0f7c87f905547ef6af33cb036c5c2a62a351d20c44",
+  "gstreamer-plugins-base.appdata.xml": "c8a7d64562a111adf5c4f24be4c26bb0c20168350d7e5e03e25f7469fc02af9c"
+ }
+}

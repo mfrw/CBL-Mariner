@@ -1,0 +1,35 @@
+diff -Nru wireless_tools.29.orig/iwlib.h wireless_tools.29/iwlib.h
+--- wireless_tools.29.orig/iwlib.h	2009-05-06 21:25:31.000000000 +0200
++++ wireless_tools.29/iwlib.h	2009-05-06 21:27:31.000000000 +0200
+@@ -53,9 +53,31 @@
+ 
+ #include <linux/types.h>		/* for "caddr_t" et al		*/
+ 
++#ifndef LINUX_VERSION_CODE
++#include <linux/version.h>
++#endif /* LINUX_VERSION_CODE */
++/* Check kernel version, new headers are supposed to be good! */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,19)
++#define _USE_LINUX_IF_H 1
++#endif /* >= */
++/* Check if net/if.h already been included */
++#ifdef _NET_IF_H
++#undef _USE_LINUX_IF_H
++#endif /* _NET_IF_H*/
++/* Check if linux/if.h already been included */
++#ifdef _LINUX_IF_H
++#define _USE_LINUX_IF_H 1
++#endif /* _LINUX_IF_H */
++
++#ifdef _USE_LINUX_IF_H
++#include <linux/socket.h>              /* for "struct sockaddr" et al  */
++#include <linux/if.h>                  /* for IFNAMSIZ and co... */
++#else
++
+ /* Glibc systems headers are supposedly less problematic than kernel ones */
+ #include <sys/socket.h>			/* for "struct sockaddr" et al	*/
+ #include <net/if.h>			/* for IFNAMSIZ and co... */
++#endif /* _USE_LINUX_IF_H */
+ 
+ /* Private copy of Wireless extensions (in this directoty) */
+ #include "wireless.h"
