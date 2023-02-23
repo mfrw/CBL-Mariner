@@ -1,0 +1,79 @@
+From 53e13b52a05c0fdc54f184d31f553a45acf0d44c Mon Sep 17 00:00:00 2001
+From: Stephen Finucane <stephenfin@redhat.com>
+Date: Mon, 1 Feb 2021 10:35:41 +0000
+Subject: [PATCH] Switch to collections.abc.*
+
+The abstract base classes previously defined in 'collections' were moved
+to 'collections.abc' in 3.3. The aliases will be removed in 3.10.
+Preempt this change now with a simple find-replace:
+
+  $ ag -l 'collections.($TYPES)' | \
+      xargs sed -i 's/\(collections\)\.\($TYPES\)/\1.abc.\2/g'
+
+Where $TYPES is the list of moved ABCs from [1].
+
+[1] https://docs.python.org/3/library/collections.abc.html
+
+Change-Id: I85f2757852c0313967f5d82166124feb10aa4c6a
+Signed-off-by: Stephen Finucane <stephenfin@redhat.com>
+---
+ oslo_utils/strutils.py            | 6 +++---
+ oslo_utils/tests/test_strutils.py | 6 ++----
+ 2 files changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/oslo_utils/strutils.py b/oslo_utils/strutils.py
+index 6295bde..16f1935 100644
+--- a/oslo_utils/strutils.py
++++ b/oslo_utils/strutils.py
+@@ -17,7 +17,7 @@
+ System-level utilities and helper functions.
+ """
+
+-import collections
++import collections.abc
+ import math
+ import re
+ import unicodedata
+@@ -400,12 +400,12 @@ def mask_dict_password(dictionary, secret="***"):  # nosec
+
+     """
+
+-    if not isinstance(dictionary, collections.Mapping):
++    if not isinstance(dictionary, collections.abc.Mapping):
+         raise TypeError("Expected a Mapping, got %s instead."
+                         % type(dictionary))
+     out = {}
+     for k, v in dictionary.items():
+-        if isinstance(v, collections.Mapping):
++        if isinstance(v, collections.abc.Mapping):
+             out[k] = mask_dict_password(v, secret=secret)
+             continue
+         # NOTE(jlvillal): Check to see if anything in the dictionary 'key'
+diff --git a/oslo_utils/tests/test_strutils.py b/oslo_utils/tests/test_strutils.py
+index f43cef2..22dd692 100644
+--- a/oslo_utils/tests/test_strutils.py
++++ b/oslo_utils/tests/test_strutils.py
+@@ -1,5 +1,3 @@
+-# -*- coding: utf-8 -*-
+-
+ # Copyright 2011 OpenStack Foundation.
+ # All Rights Reserved.
+ #
+@@ -15,7 +13,7 @@
+ #    License for the specific language governing permissions and limitations
+ #    under the License.
+
+-import collections
++import collections.abc
+ import copy
+ import math
+ from unittest import mock
+@@ -665,7 +663,7 @@ def test_mask_password(self):
+         self.assertEqual(expected, strutils.mask_password(payload))
+
+
+-class TestMapping(collections.Mapping):
++class TestMapping(collections.abc.Mapping):
+     """Test class for non-dict mappings"""
+     def __init__(self):
+         super(TestMapping, self).__init__()
