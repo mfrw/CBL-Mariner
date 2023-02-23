@@ -1,0 +1,92 @@
+From 073dfb83021ec59bca50ee09762c552c77b98bd9 Mon Sep 17 00:00:00 2001
+From: Fabio Valentini <decathorpe@gmail.com>
+Date: Tue, 25 Aug 2020 11:32:48 +0200
+Subject: [PATCH] enable support for JDTJavaCompiler and AntJavaCompiler
+
+---
+ impl/pom.xml                                  | 33 +++++++------------
+ .../jasper/compiler/JDTJavaCompiler.java      |  4 +++
+ pom.xml                                       |  1 +
+ 3 files changed, 17 insertions(+), 21 deletions(-)
+
+diff --git a/impl/pom.xml b/impl/pom.xml
+index 8cb08ca..7e6e2f3 100644
+--- a/impl/pom.xml
++++ b/impl/pom.xml
+@@ -149,18 +149,7 @@
+                 <configuration>
+                     <source>1.7</source>
+                     <target>1.7</target>
+-                    <compilerArgument>-Xlint:unchecked</compilerArgument>
+                     <excludes>
+-                        <exclude>
+-                            org/apache/jasper/compiler/JDTJavaCompiler.java
+-                        </exclude>
+-                        <exclude>
+-                            org/apache/jasper/compiler/AntJavaCompiler.java
+-                        </exclude>
+-                        <exclude>
+-                            <!-- This is only used by AntJavaCompiler -->
+-                            org/apache/jasper/util/SystemLogHandler.java
+-                        </exclude>
+                         <exclude>
+                             <!-- We keep the source just in case -->
+                             org/apache/jasper/runtime/PerThreadTagHandlerPool.java
+@@ -270,15 +259,17 @@
+             <artifactId>jakarta.servlet.jsp-api</artifactId>
+             <version>2.3.6</version>
+         </dependency>
+-
+-<!--
+-  Needed only if we include JDTJavaCompiler.java
+-    <dependency>
+-      <groupId>eclipse</groupId>
+-      <artifactId>jdtcore</artifactId>
+-      <version>3.1.0</version>
+-      <scope>compile</scope>
+-    </dependency>
+--->
++        <dependency>
++            <groupId>org.eclipse.jdt</groupId>
++            <artifactId>core</artifactId>
++            <version>3.1.0</version>
++            <scope>provided</scope>
++        </dependency>
++        <dependency>
++            <groupId>org.apache.ant</groupId>
++            <artifactId>ant</artifactId>
++            <version>1.10.8</version>
++            <scope>provided</scope>
++        </dependency>
+     </dependencies>
+ </project>
+diff --git a/impl/src/main/java/org/apache/jasper/compiler/JDTJavaCompiler.java b/impl/src/main/java/org/apache/jasper/compiler/JDTJavaCompiler.java
+index d6d8b9e..0fa3d99 100644
+--- a/impl/src/main/java/org/apache/jasper/compiler/JDTJavaCompiler.java
++++ b/impl/src/main/java/org/apache/jasper/compiler/JDTJavaCompiler.java
+@@ -224,6 +224,10 @@ public class JDTJavaCompiler implements JavaCompiler {
+                 return className.toCharArray();
+             }
+             
++            public boolean ignoreOptionalProblems() {
++                return false;
++            }
++
+             public char[] getContents() {
+                 char[] result = null;
+                 Reader reader = null;
+diff --git a/pom.xml b/pom.xml
+index 23203cc..9e4462f 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -53,6 +53,7 @@
+ 
+     <modules>
+         <module>api</module>
++        <module>impl</module>
+         <module>spec</module>
+     </modules>
+ 
+-- 
+2.26.2
+

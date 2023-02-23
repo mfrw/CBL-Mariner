@@ -1,0 +1,62 @@
+From 9766baf4875526f85e613b26fa83d25b889552b4 Mon Sep 17 00:00:00 2001
+From: Mat Booth <mat.booth@redhat.com>
+Date: Wed, 19 Aug 2020 15:52:04 +0100
+Subject: [PATCH 2/2] Port to latest version of Servlet API
+
+---
+ .../jasper/servlet/JspCServletContext.java    | 41 +++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+
+diff --git a/impl/src/main/java/org/apache/jasper/servlet/JspCServletContext.java b/impl/src/main/java/org/apache/jasper/servlet/JspCServletContext.java
+index ff89225..3d41919 100644
+--- a/impl/src/main/java/org/apache/jasper/servlet/JspCServletContext.java
++++ b/impl/src/main/java/org/apache/jasper/servlet/JspCServletContext.java
+@@ -883,4 +883,45 @@ public class JspCServletContext implements ServletContext {
+             return this.jspPropertyGroups;
+         }
+     }
++
++    @Override
++    public String getVirtualServerName() {
++        // TODO new in 3.1
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public int getSessionTimeout() {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public void setSessionTimeout(int sessionTimeout) {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public String getRequestCharacterEncoding() {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public void setRequestCharacterEncoding(String encoding) {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public String getResponseCharacterEncoding() {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public void setResponseCharacterEncoding(String encoding) {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
++
++    public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile) {
++        // TODO new in 4.0
++        throw new UnsupportedOperationException("Not implemented yet");
++    }
+ }
+-- 
+2.26.2
+
