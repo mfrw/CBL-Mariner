@@ -1,0 +1,43 @@
+From a6d4d6223ef75119d5373fa4cc04161bcdb4e769 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Petr=20P=C3=ADsa=C5=99?= <ppisar@redhat.com>
+Date: Mon, 29 Mar 2021 10:45:10 +0200
+Subject: [PATCH] Imake.tmpl: Invoke "ar cq" with binutils
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+GNU binutils 2.36 repurposed "l" modifier. It used to be ignored, now
+it specifies the dependencies of a static library to be recorded in an
+archive.
+
+That broke nas which uses imake as a build configiration tool:
+
+$ ar clq libdia.a dispatch.o dixutils.o events.o globals.o main.o resource.o swapreq.o        tables.o swaprep.o        audispatch.o auswap.o autables.o auevents.o auutil.o auconfig.o        auprocess.o  nasconf.o lex.o gram.o
+ar: libdeps specified more than once
+
+This patch changes AR command from "ar clq" to "ar cq" if binutils are
+used.
+
+<https://bugzilla.redhat.com/show_bug.cgi?id=1943274>
+
+Signed-off-by: Petr Písař <ppisar@redhat.com>
+---
+ Imake.tmpl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Imake.tmpl b/Imake.tmpl
+index 9d02cb6..3f89ebf 100644
+--- a/Imake.tmpl
++++ b/Imake.tmpl
+@@ -1078,7 +1078,7 @@ TCLIBDIR = TclLibDir
+ #define ArCmdBase ar
+ #endif
+ #ifndef ArCmd
+-#if HasLargeTmp || SystemV4
++#if HasLargeTmp || SystemV4 || LinuxBinUtilsMajorVersion
+ #define ArCmd ArCmdBase cq
+ #else
+ #define ArCmd ArCmdBase clq
+-- 
+2.26.3
+
