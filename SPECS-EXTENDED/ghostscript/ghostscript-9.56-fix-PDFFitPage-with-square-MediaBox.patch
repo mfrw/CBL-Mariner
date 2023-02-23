@@ -1,0 +1,35 @@
+From 50e114295a65cceac49123f359e24f2f5007110a Mon Sep 17 00:00:00 2001
+Message-Id: <50e114295a65cceac49123f359e24f2f5007110a.1662477568.git.mjg@fedoraproject.org>
+From: Ken Sharp <ken.sharp@artifex.com>
+Date: Tue, 6 Sep 2022 14:39:33 +0100
+Subject: [PATCH] GhostPDF + GS - fix PDFFitPage with square MediaBox
+
+Bug #705849 "New PDF interpreter errors out with PDFFitPage"
+
+If the input PDF file had square media then we would correctly decide
+we did not need to rotate the media for a better fit, but we left the
+values we would normally use to calculate if rotation was required on
+the operand stack, resulting in an error.
+
+Pop the unused values.
+
+Signed-off-by: Michael J Gruber <mjg@fedoraproject.org>
+---
+ Resource/Init/pdf_main.ps | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Resource/Init/pdf_main.ps b/Resource/Init/pdf_main.ps
+index 3259c0fe3..27eb7ab33 100644
+--- a/Resource/Init/pdf_main.ps
++++ b/Resource/Init/pdf_main.ps
+@@ -364,6 +364,7 @@ systemdict /NEWPDF known not {/NEWPDF //true def} if
+     3 1 roll eq
+     or                   % square media or square page, no point in rotating
+     {
++      pop pop pop pop
+       //false
+     }
+     {
+-- 
+2.37.2.827.g188294c313
+

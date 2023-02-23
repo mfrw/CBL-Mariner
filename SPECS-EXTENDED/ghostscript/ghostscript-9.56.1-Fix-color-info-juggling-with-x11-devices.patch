@@ -1,0 +1,78 @@
+From a3768a91418925a5eb5cf268222f1e90e1abc396 Mon Sep 17 00:00:00 2001
+Message-Id: <a3768a91418925a5eb5cf268222f1e90e1abc396.1664963046.git.mjg@fedoraproject.org>
+From: Chris Liddell <chris.liddell@artifex.com>
+Date: Mon, 3 Oct 2022 16:17:56 +0100
+Subject: [PATCH] Bug 705863: Fix color info juggling with x11 devices
+
+For the "wrapped" X11 devices (x11cmyk, x11gray2, x11gray4 etc) we have to
+juggle the color info between the wrapping device and the wrapped device so that
+the put/get_params continue to work properly, and not cause bad rendering and
+segfaults.
+
+The "wrapped" x11 device initialises with 24bit RGB color setup, and doesn't get
+updated to match the actual display until the device is opened.
+
+The problem was, if it was not talking to a 24bit RGB X display, the stashed
+color_info did not match the actual color_info of the actual device, and
+resulted in segfaults when using wrapped devices on those non 24bit RGB
+displays.
+
+This just ensures the stashed color_info gets updated after those devices config
+changes take place.
+
+Also reverts "Bug 703013: Fix color_info for buffered/wrapped X11 devices"
+commit: 270438bfda605c258f5841e7917a16fdc2cf7968.
+
+Signed-off-by: Michael J Gruber <mjg@fedoraproject.org>
+---
+ devices/gdevxcmp.c | 4 ++--
+ devices/gdevxini.c | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/devices/gdevxcmp.c b/devices/gdevxcmp.c
+index c43426d76..55051763b 100644
+--- a/devices/gdevxcmp.c
++++ b/devices/gdevxcmp.c
+@@ -1,4 +1,4 @@
+-/* Copyright (C) 2001-2021 Artifex Software, Inc.
++/* Copyright (C) 2001-2022 Artifex Software, Inc.
+    All Rights Reserved.
+ 
+    This software is provided AS-IS with no warranty, either express or
+@@ -477,7 +477,7 @@ monochrome:
+         }
+     }
+ #endif
+-
++    xdev->orig_color_info = xdev->color_info;
+     return 0;
+ }
+ 
+diff --git a/devices/gdevxini.c b/devices/gdevxini.c
+index fafcd42a8..914e88e78 100644
+--- a/devices/gdevxini.c
++++ b/devices/gdevxini.c
+@@ -589,9 +589,9 @@ x_set_buffer(gx_device_X * xdev)
+          * *But* if we run buffered, we have to use the real specs of the real x11 device.
+          * Hence, the real color_info is saved into orig_color_info, and we use that here.
+          */
+-        if (mdev == 0 || mdev->color_info.depth != xdev->color_info.depth) {
++        if (mdev == 0 || mdev->color_info.depth != xdev->orig_color_info.depth) {
+             const gx_device_memory *mdproto =
+-                gdev_mem_device_for_bits(xdev->color_info.depth);
++                gdev_mem_device_for_bits(xdev->orig_color_info.depth);
+ 
+             if (!mdproto) {
+                 buffered = false;
+@@ -643,7 +643,7 @@ x_set_buffer(gx_device_X * xdev)
+             rc_decrement(mdev->icc_struct, "x_set_buffer");
+             mdev->icc_struct = xdev->icc_struct;
+             rc_increment(xdev->icc_struct);
+-            mdev->color_info = xdev->color_info;
++            mdev->color_info = xdev->orig_color_info;
+             mdev->base = xdev->buffer;
+             gdev_mem_open_scan_lines(mdev, xdev->height);
+         }
+-- 
+2.38.0.420.gc7a4235b32
+
