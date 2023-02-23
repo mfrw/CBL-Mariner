@@ -1,0 +1,50 @@
+From 5d2d43b1189a52aa5a98d93496f71f0348729b0e Mon Sep 17 00:00:00 2001
+From: Mamoru TASAKA <mtasaka@fedoraproject.org>
+Date: Sat, 20 Mar 2021 23:45:09 +0900
+Subject: [PATCH] load_autostart: never reuse GKeyFile object
+
+As written on:
+https://developer.gnome.org/glib/stable/glib-Key-value-file-parser.html#g-key-file-load-from-file
+an empty GKeyFile object must be passed to g_key_file_load_from_file .
+---
+ lxsession-edit/lxsession-edit-common.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/lxsession-edit/lxsession-edit-common.c b/lxsession-edit/lxsession-edit-common.c
+index 3de3dbb..019416d 100644
+--- a/lxsession-edit/lxsession-edit-common.c
++++ b/lxsession-edit/lxsession-edit-common.c
+@@ -136,9 +136,10 @@ void get_autostart_files_in_dir( GHashTable* hash, const char* session_name, con
+     g_free( dir_path );
+ }
+ 
+-void add_autostart_file(char* desktop_id, char* file, GKeyFile* kf)
++void add_autostart_file(char* desktop_id, char* file )
+ {
+     GtkTreeIter it;
++    GKeyFile* kf = g_key_file_new();
+ 
+     const char* session_name_local = NULL;
+ 
+@@ -176,6 +177,7 @@ void add_autostart_file(char* desktop_id, char* file, GKeyFile* kf)
+             g_free(comment);
+         }
+     }
++    g_key_file_free( kf );
+ }
+ 
+ void load_autostart(const char* session_name)
+@@ -193,9 +195,7 @@ void load_autostart(const char* session_name)
+ 
+     if( g_hash_table_size( hash ) > 0 )
+     {
+-        GKeyFile* kf = g_key_file_new();
+-        g_hash_table_foreach( hash, (GHFunc)add_autostart_file, kf );
+-        g_key_file_free( kf );
++        g_hash_table_foreach( hash, (GHFunc)add_autostart_file, NULL );
+     }
+     g_hash_table_destroy( hash );
+ }
+-- 
+2.30.2
+
