@@ -1,0 +1,30 @@
+From a71257778d049875592aba4d018df4d5b5a724e4 Mon Sep 17 00:00:00 2001
+From: Debarshi Ray <debarshir@gnome.org>
+Date: Thu, 14 Jul 2022 15:43:06 +0200
+Subject: [PATCH] selinux: Permit read access to symbolic links in
+ /var/lib/flatpak
+
+Commit 8617ab0ad0243f5a granted read and lock access to
+/var/lib/flatpak but didn't cover symbolic links.  This explicitly
+permits that to avoid running into SELinux denials.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=2071215
+---
+ selinux/flatpak.te | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/selinux/flatpak.te b/selinux/flatpak.te
+index 66ebcaa18420..bb3d80e316eb 100644
+--- a/selinux/flatpak.te
++++ b/selinux/flatpak.te
+@@ -15,6 +15,7 @@ init_daemon_domain(flatpak_helper_t, flatpak_helper_exec_t)
+ auth_read_passwd(flatpak_helper_t)
+ files_list_var_lib(flatpak_helper_t)
+ files_read_var_lib_files(flatpak_helper_t)
++files_read_var_lib_symlinks(flatpak_helper_t)
+ 
+ ifdef(`corecmd_watch_bin_dirs',`
+     corecmd_watch_bin_dirs(flatpak_helper_t)
+-- 
+2.35.3
+
