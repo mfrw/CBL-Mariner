@@ -1,0 +1,26 @@
+From 25f5022fcf3c43c43bfdb10ff2c1dc60588b9fa6 Mon Sep 17 00:00:00 2001
+From: Barrett Ingram <bingram@eab.com>
+Date: Sat, 2 Jan 2021 17:53:36 -0600
+Subject: [PATCH] Add CI support for ruby 3 and fix broken spec
+
+Spec started failing because a statement which we expected to be a
+syntax error is now interpreted as a valid pattern-matching statement.
+Swapping the hash-rockets for colons turns this back into a syntax
+error.
+---
+ spec/syntax_checking_spec.rb |  2 +-
+ 1 files changed, 1 insertions(+), 1 deletion(-)
+
+diff --git a/spec/syntax_checking_spec.rb b/spec/syntax_checking_spec.rb
+index ca75ba9f0..beba497f1 100644
+--- a/spec/syntax_checking_spec.rb
++++ b/spec/syntax_checking_spec.rb
+@@ -36,7 +36,7 @@
+     ["o = Object.new.tap{ def o.render;", "'MEH'", "}"],
+ 
+     # multiple syntax errors reported in one SyntaxException
+-    ["puts {'key'=>'val'}.to_json"]
++    ["puts {key: 'val'}.to_json"]
+   ].compact.each do |foo|
+     it "should raise an error on invalid syntax like #{foo.inspect}" do
+       redirect_pry_io(InputTester.new(*foo), @str_output) do
