@@ -1,0 +1,9 @@
+{
+ "Signatures": {
+  "generate-tarball.sh": "58dd4292b19c52eeb0e1a1412ce39b2fc6b7a6d3ac331eb8c8a089813ade55f9",
+  "mockito-3.12.4.tar.gz": "03add369c20b03cb1ded7e17010ad01774159126ce1ea937f5258a4dbe51d3de",
+  "mockito-core.pom": "d73f6deab5397fea378f5016ed9649b34a0ff6e626c3b47350623cdc9baf3aa0",
+  "mockito-inline-3.12.4.pom": "41adfa35cde92bb74e640985fd79544cd2cda96ca9ee4e2edb0cc51223814e01",
+  "mockito-junit-jupiter-3.12.4.pom": "cfb4472fe5296860727a753316af10d0faf2a312ff4c327f5a71684a01ce78e9"
+ }
+}
