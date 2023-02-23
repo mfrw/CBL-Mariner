@@ -1,0 +1,66 @@
+--- build.properties.default.orig       2022-06-21 20:30:04.498997718 +0800
++++ build.properties.default    2022-06-21 20:30:57.579522800 +0800
+@@ -309,6 +309,16 @@ bnd.home=${base.path}/bnd-${bnd.version}
+ bnd.jar=${bnd.home}/biz.aQute.bnd-${bnd.version}.jar
+ bnd.loc=${base-maven.loc}/biz/aQute/bnd/biz.aQute.bnd/${bnd.version}/biz.aQute.bnd-${bnd.version}.jar
+
++# ----- OSGi annotations bundle, version 1.0.0 or later            -----
++# ----- required to avoid Javadoc error when using bnd annotations -----
++osgi-annotations.version=1.1.1
++osgi-annotations.checksum.enabled=true
++osgi-annotations.checksum.algorithm=MD5|SHA-1
++osgi-annotations.checksum.value=04e5db48a469cb53dd0e4e954deab2e0|a1644f3dbbb614f2a44671d27dd13c4d9142007d
++osgi-annotations.home=${base.path}/osgi-annotations-${osgi-annotations.version}
++osgi-annotations.jar=${osgi-annotations.home}/org.osgi.annotation.bundle-${osgi-annotations.version}.jar
++osgi-annotations.loc=${base-maven.loc}/org/osgi/org.osgi.annotation.bundle/${osgi-annotations.version}/org.osgi.annotation.bundle-${osgi-annotations.version}.jar
++
+ # ----- JSign, version 4.1 or later -----
+ jsign.version=4.2
+
+--- build.xml.orig	2022-06-21 20:36:12.785560093 +0800
++++ build.xml	2022-06-21 20:40:41.155154959 +0800
+@@ -213,6 +213,7 @@
+   <!-- Classpaths -->
+   <path id="compile.classpath">
+     <pathelement location="${bnd.jar}"/>
++    <pathelement location="${osgi-annotations.jar}"/>
+     <pathelement location="${jdt.jar}"/>
+     <pathelement location="${jaxrpc-lib.jar}"/>
+     <pathelement location="${wsdl4j-lib.jar}"/>
+@@ -2270,7 +2271,8 @@ Apache Tomcat ${version} native binaries
+       failonwarning="true">
+       <classpath>
+         <path refid="compile.classpath"/>
+-        <path location="${ant.core.lib}"/>
++	<path location="${ant.core.lib}"/>
++	<path location="${osgi-annotations.jar}"/>
+       </classpath>
+       <link href="../annotationapi"/>
+       <link href="../servletapi"/>
+@@ -3671,12 +3673,26 @@ Read the Building page on the Apache Tom
+       <param name="checksum.algorithm" value="${bnd.checksum.algorithm}"/>
+       <param name="checksum.value" value="${bnd.checksum.value}"/>
+     </antcall>
++    <!-- Download OSGi annotations -->
++    <antcall target="downloadfile">
++      <param name="sourcefile" value="${osgi-annotations.loc}"/>
++      <param name="destfile" value="${osgi-annotations.jar}"/>
++      <param name="destdir" value="${osgi-annotations.home}"/>
++      <param name="checksum.enabled" value="${osgi-annotations.checksum.enabled}"/>
++      <param name="checksum.algorithm" value="${osgi-annotations.checksum.algorithm}"/>
++      <param name="checksum.value" value="${osgi-annotations.checksum.value}"/>
++    </antcall>
+   </target>
+ 
+   <target name="setup-bnd" depends="download-bnd">
+     <!-- Add bnd tasks to project -->
+     <path id="bnd.classpath">
+       <fileset file="${bnd.jar}" />
++      <fileset file="${bndlib.jar}" />
++      <fileset file="${bndlibg.jar}" />
++      <fileset file="${bndannotation.jar}" />
++      <fileset file="${slf4j-api.jar}" />
++      <fileset file="${osgi-cmpn.jar}" />
+     </path>
+ 
+     <taskdef resource="aQute/bnd/ant/taskdef.properties" classpathref="bnd.classpath" />
