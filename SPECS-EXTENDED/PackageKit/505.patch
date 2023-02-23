@@ -1,0 +1,56 @@
+From 7c819714639fed3819b7f5b8ea3edd842e425feb Mon Sep 17 00:00:00 2001
+From: Milan Crha <mcrha@redhat.com>
+Date: Fri, 10 Sep 2021 09:53:14 +0200
+Subject: [PATCH] pk-engine: Always allow user interaction for offline
+ update/upgrade
+
+This partly reverts commit 9b7e083cf849c4ed4d66fe32250f1615ab577d94.
+The offline update/upgrade triggers do need the user interaction, to
+get the credentials from the polkit, otherwise the trigger cannot
+do its job.
+
+Closes https://github.com/PackageKit/PackageKit/issues/504
+---
+ src/pk-engine.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/pk-engine.c b/src/pk-engine.c
+index f4fe2805e..a8e9fef14 100644
+--- a/src/pk-engine.c
++++ b/src/pk-engine.c
+@@ -1616,7 +1616,7 @@ pk_engine_offline_method_call (GDBusConnection *connection_, const gchar *sender
+ 		polkit_authority_check_authorization (engine->priv->authority, subject,
+ 						      "org.freedesktop.packagekit.trigger-offline-update",
+ 						      NULL,
+-						      get_polkit_flags_for_dbus_invocation (invocation),
++						      POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION,
+ 						      NULL,
+ 						      pk_engine_offline_helper_cb,
+ 						      helper);
+@@ -1630,7 +1630,7 @@ pk_engine_offline_method_call (GDBusConnection *connection_, const gchar *sender
+ 		polkit_authority_check_authorization (engine->priv->authority, subject,
+ 						      "org.freedesktop.packagekit.clear-offline-update",
+ 						      NULL,
+-						      get_polkit_flags_for_dbus_invocation (invocation),
++						      POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION,
+ 						      NULL,
+ 						      pk_engine_offline_helper_cb,
+ 						      helper);
+@@ -1657,7 +1657,7 @@ pk_engine_offline_method_call (GDBusConnection *connection_, const gchar *sender
+ 		polkit_authority_check_authorization (engine->priv->authority, subject,
+ 						      "org.freedesktop.packagekit.trigger-offline-update",
+ 						      NULL,
+-						      get_polkit_flags_for_dbus_invocation (invocation),
++						      POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION,
+ 						      NULL,
+ 						      pk_engine_offline_helper_cb,
+ 						      helper);
+@@ -1684,7 +1684,7 @@ pk_engine_offline_method_call (GDBusConnection *connection_, const gchar *sender
+ 		polkit_authority_check_authorization (engine->priv->authority, subject,
+ 						      "org.freedesktop.packagekit.trigger-offline-upgrade",
+ 						      NULL,
+-						      get_polkit_flags_for_dbus_invocation (invocation),
++						      POLKIT_CHECK_AUTHORIZATION_FLAGS_ALLOW_USER_INTERACTION,
+ 						      NULL,
+ 						      pk_engine_offline_helper_cb,
+ 						      helper);
