@@ -1,0 +1,7 @@
+{
+ "Signatures": {
+  "generate-tarball.sh": "8aa63cb00886e8e8f06afafa3e9c36b8152189e543355ec6740e721b42a33b8a",
+  "pom.xml": "ced597685c7c169e218b26920169ea0ff9c84ea231b9b4b3bab7bda626833342",
+  "testng-7.4.0.tar.gz": "7aca4c7d478d08563db219c105693381b6a53c74a7c5698ba975509121cb3fd9"
+ }
+}
