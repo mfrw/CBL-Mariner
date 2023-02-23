@@ -1,0 +1,3594 @@
+From bfb6a425eaa9efb538d26843e907ae245b7928ea Mon Sep 17 00:00:00 2001
+From: David Shea <reallylongword@gmail.com>
+Date: Wed, 5 Oct 2022 22:36:16 -0400
+Subject: [PATCH 5/7] Convert the tests to pytest
+
+Get rid of the test runner and run the tests using tox. Fix the more
+obvious bugs in the tests.
+---
+ MANIFEST.in                  |   2 +-
+ pyproject.toml               |   3 -
+ test/conftest.py             |  82 ++++
+ test/run_tests               |  78 ----
+ test/setup_certs.py          | 840 +++++++++++++++--------------------
+ test/test_cert_components.py | 434 +++++++++---------
+ test/test_cert_request.py    | 232 +++++-----
+ test/test_cipher.py          | 184 +++-----
+ test/test_client_server.py   | 330 ++++++--------
+ test/test_digest.py          | 117 +----
+ test/test_misc.py            |  56 ++-
+ test/test_ocsp.py            |  70 +--
+ test/test_pkcs12.py          | 345 +++++++-------
+ test/util.py                 |  44 +-
+ tox.ini                      |   8 +
+ 15 files changed, 1204 insertions(+), 1621 deletions(-)
+ create mode 100644 test/conftest.py
+ delete mode 100755 test/run_tests
+ mode change 100755 => 100644 test/setup_certs.py
+ mode change 100755 => 100644 test/test_cert_components.py
+ mode change 100755 => 100644 test/test_cert_request.py
+ mode change 100755 => 100644 test/test_cipher.py
+ mode change 100755 => 100644 test/test_client_server.py
+ mode change 100755 => 100644 test/test_digest.py
+ mode change 100755 => 100644 test/test_misc.py
+ mode change 100755 => 100644 test/test_pkcs12.py
+ create mode 100644 tox.ini
+
+diff --git a/MANIFEST.in b/MANIFEST.in
+index 75a9006..32a7ee6 100644
+--- a/MANIFEST.in
++++ b/MANIFEST.in
+@@ -1,4 +1,4 @@
+ include doc/ChangeLog
+ include doc/examples/*.py
+-include test/run_tests test/setup_certs.py test/util.py
++include test/setup_certs.py test/util.py
+ include src/*.h
+diff --git a/pyproject.toml b/pyproject.toml
+index e21ab33..5697aca 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -14,6 +14,3 @@ email = "jdennis@redhat.com"
+ 
+ [project.urls]
+ homepage = "http://www.mozilla.org/projects/security/pki/python-nss"
+-
+-[project.optional-dependencies]
+-test = ["six"]
+diff --git a/test/conftest.py b/test/conftest.py
+new file mode 100644
+index 0000000..1a93459
+--- /dev/null
++++ b/test/conftest.py
+@@ -0,0 +1,82 @@
++import logging
++import nss.nss as nss
++
++# Helper function for test_digest
++def digest_test(name, in_filename, py_digest_ctx, nss_digest_func, hash_oid):
++    CHUNK_SIZE = 128
++    hash_oid_name = nss.oid_str(hash_oid)
++    log = logging.getLogger()
++
++    log.debug(
++        "Running test %s: nss_digest_func=%s hash_oid=%s in_filename=%s",
++        name,
++        nss_digest_func.__name__,
++        hash_oid_name,
++        in_filename,
++    )
++
++    with open(in_filename, "rb") as f:
++        ref_data = f.read()
++
++    # Run the system hash function to get a reference result.
++    py_digest_ctx.update(ref_data)
++    reference_digest = py_digest_ctx.digest()
++    reference_digest_hex = py_digest_ctx.hexdigest()
++    log.debug("reference_digest\n%s", reference_digest_hex)
++
++    # Run the test with convenience digest function (e.g. nss.sha256_digest, etc.).
++    test_digest = nss_digest_func(ref_data)
++    test_digest_hex = nss.data_to_hex(test_digest, separator=None)
++    log.debug("nss %s\n%s", nss_digest_func.__name__, test_digest_hex)
++
++    assert test_digest == reference_digest, "nss %s test failed reference=%s, test=%s" % (
++        nss_digest_func.__name__,
++        reference_digest_hex,
++        test_digest_hex,
++    )
++
++    # Run the test using the generic hash_buf function specifying the hash algorithm.
++    test_digest = nss.hash_buf(hash_oid, ref_data)
++    test_digest_hex = nss.data_to_hex(test_digest, separator=None)
++    log.debug("nss.hash_buf %s\n%s", hash_oid_name, test_digest_hex)
++    assert test_digest == reference_digest, "nss.hash_buf %s test failed reference=%s test=%s" % (
++        hash_oid_name,
++        reference_digest_hex,
++        test_digest_hex,
++    )
++
++    # Run the test using the lowest level hashing functions by specifying the hash algorithm.
++    # The entire input data is supplied all at once in a single call.
++    context = nss.create_digest_context(hash_oid)
++    context.digest_begin()
++    context.digest_op(ref_data)
++    test_digest = context.digest_final()
++    test_digest_hex = nss.data_to_hex(test_digest, separator=None)
++    log.debug("nss.digest_context %s\n%s", hash_oid_name, test_digest_hex)
++
++    assert test_digest == reference_digest, "nss.digest_context %s test failed reference=%s test=%s" % (
++        hash_oid_name,
++        reference_digest_hex,
++        test_digest_hex,
++    )
++
++    # Run the test using the lowest level hashing functions by specifying the hash algorithm
++    # and feeding 'chunks' of data one at a time to be consumed.
++    with open(in_filename, "rb") as in_file:
++        context = nss.create_digest_context(hash_oid)
++        context.digest_begin()
++        while True:
++            in_data = in_file.read(CHUNK_SIZE)
++            if len(in_data) == 0:
++                break
++            context.digest_op(in_data)
++
++    test_digest = context.digest_final()
++    test_digest_hex = nss.data_to_hex(test_digest, separator=None)
++    log.debug("chunked nss.digest_context %s\n%s", hash_oid_name, test_digest_hex)
++
++    assert test_digest == reference_digest, "chunked nss.digest_context %s test failed reference=%s test=%s" % (
++        hash_oid_name,
++        reference_digest_hex,
++        test_digest_hex,
++    )
+diff --git a/test/run_tests b/test/run_tests
+deleted file mode 100755
+index a5ea8f0..0000000
+--- a/test/run_tests
++++ /dev/null
+@@ -1,78 +0,0 @@
+-from __future__ import print_function
+-import argparse
+-import os
+-import sys
+-import unittest
+-from util import get_build_dir
+-
+-#-------------------------------------------------------------------------------
+-
+-def run_tests():
+-
+-    import setup_certs
+-    import test_cert_components
+-    import test_cipher
+-    import test_digest
+-    import test_pkcs12
+-    import test_misc
+-    import test_ocsp
+-    import test_cert_request
+-    import test_client_server
+-
+-    setup_certs.setup_certs([])
+-
+-    loader = unittest.TestLoader()
+-    runner = unittest.TextTestRunner()
+-
+-    suite  = loader.loadTestsFromModule(test_cert_components)
+-    suite.addTests(loader.loadTestsFromModule(test_cipher))
+-    suite.addTests(loader.loadTestsFromModule(test_digest))
+-    suite.addTests(loader.loadTestsFromModule(test_pkcs12))
+-    suite.addTests(loader.loadTestsFromModule(test_misc))
+-    suite.addTests(loader.loadTestsFromModule(test_ocsp))
+-    suite.addTests(loader.loadTestsFromModule(test_cert_request))
+-    suite.addTests(loader.loadTestsFromModule(test_client_server))
+-
+-    result = runner.run(suite)
+-    return len(result.failures)
+-
+-#-------------------------------------------------------------------------------
+-
+-def main():
+-    parser = argparse.ArgumentParser(description='run the units (installed or in tree)')
+-    parser.add_argument('-i', '--installed', action='store_false', dest='in_tree',
+-                        help='run tests using installed library')
+-    parser.add_argument('-t', '--in-tree', action='store_true', dest='in_tree',
+-                        help='run tests using devel tree')
+-
+-    parser.set_defaults(in_tree = False,
+-                        )
+-
+-    options = parser.parse_args()
+-
+-    if options.in_tree:
+-        # Run the tests "in the tree"
+-        # Rather than testing with installed versions run the test
+-        # with the package built in this tree.
+-
+-        build_dir = get_build_dir()
+-        if build_dir and os.path.exists(build_dir):
+-            print("Using local libraries from tree, located here:\n%s\n" % build_dir)
+-            sys.path.insert(0, build_dir)
+-        else:
+-            print("ERROR: Unable to locate in tree libraries", file=sys.stderr)
+-            return 2
+-    else:
+-        print("Using installed libraries")
+-
+-    num_failures = run_tests()
+-
+-    if num_failures == 0:
+-        return 0
+-    else:
+-        return 1
+-
+-#-------------------------------------------------------------------------------
+-
+-if __name__ == '__main__':
+-    sys.exit(main())
+diff --git a/test/setup_certs.py b/test/setup_certs.py
+old mode 100755
+new mode 100644
+index b7434fa..01c0775
+--- a/test/setup_certs.py
++++ b/test/setup_certs.py
+@@ -1,189 +1,85 @@
+-from __future__ import absolute_import
+-
+-import argparse
+-import atexit
++from collections.abc import Generator
++from contextlib import contextmanager
+ import logging
+ import os
++import pathlib
+ import re
+-import shutil
+ import subprocess
+-import sys
+-from string import Template
+-import tempfile
+-import six
++from tempfile import NamedTemporaryFile
++import typing
+ 
+-#-------------------------------------------------------------------------------
+-logger = None
++import pytest
++
++from util import resolve_path
++
++logger = logging.getLogger()
+ 
+ FIPS_SWITCH_FAILED_ERR = 11
+ FIPS_ALREADY_ON_ERR = 12
+ FIPS_ALREADY_OFF_ERR = 13
+ 
++_StrOrPath: typing.TypeAlias = str | os.PathLike[str]
+ 
+-class CmdError(Exception):
+-    def __init__(self, cmd_args, returncode, message=None, stdout=None, stderr=None):
+-        self.cmd_args = cmd_args
+-        self.returncode = returncode
+-        if message is None:
+-            self.message = 'Failed error=%s, ' % (returncode)
+-            if stderr:
+-                self.message += '"%s", ' % stderr
+-            self.message += 'args=%s' % (cmd_args)
+-        else:
+-            self.message = message
+-        self.stdout = stdout
+-        self.stderr = stderr
+ 
+-    def __str__(self):
+-        return self.message
++@contextmanager
++def _passwd_file(db_passwd: str) -> Generator[str, None, None]:
++    with NamedTemporaryFile() as f:
++        f.write(db_passwd.encode("utf-8"))
++        yield f.name
+ 
+ 
+-def run_cmd(cmd_args, input=None):
+-    logging.debug(' '.join(cmd_args))
+-    try:
+-        p = subprocess.Popen(cmd_args,
+-                             stdin=subprocess.PIPE,
+-                             stdout=subprocess.PIPE,
+-                             stderr=subprocess.PIPE,
+-                             universal_newlines=True)
+-        stdout, stderr = p.communicate(input)
+-        returncode = p.returncode
+-        if returncode != 0:
+-            raise CmdError(cmd_args, returncode,
+-                           'failed %s' % (' '.join(cmd_args)),
+-                           stdout, stderr)
+-        return stdout, stderr
+-    except OSError as e:
+-        raise CmdError(cmd_args, e.errno, stderr=str(e))
+-
+-def exit_handler(options):
+-    logging.debug('in exit handler')
+-
+-    if options.passwd_filename is not None:
+-        logging.debug('removing passwd_filename=%s', options.passwd_filename)
+-        os.remove(options.passwd_filename)
+-
+-    if options.noise_filename is not None:
+-        logging.debug('removing noise_filename=%s', options.noise_filename)
+-        os.remove(options.noise_filename)
+-
+-def write_serial(options, serial_number):
+-    with open(options.serial_file, 'w') as f:
+-        f.write('%x\n' % serial_number)
+-
+-
+-def read_serial(options):
+-    if not os.path.exists(options.serial_file):
+-        write_serial(options, options.serial_number)
+-
+-    with open(options.serial_file) as f:
+-        serial_number = int(f.readline(), 16)
+-    return serial_number
+-
+-
+-def init_noise_file(options):
+-    '''Generate a noise file to be used when creating a key
+-
+-    We create a temporary file on first use and continue to use
+-    the same temporary file for the duration of this process.
+-    Each time this function is called it writes new random data
+-    into the file.
+-    '''
++@contextmanager
++def _noise_file() -> Generator[str, None, None]:
+     random_data = os.urandom(40)
+ 
+-    if options.noise_filename is None:
+-        fd, options.noise_filename = tempfile.mkstemp()
+-        os.write(fd, random_data)
++    with NamedTemporaryFile() as f:
++        f.write(random_data)
++        yield f.name
++
++
++def _create_database(db_passwd: str, db_name: str):
++    with _passwd_file(db_passwd) as pw:
++        cmd_args = [resolve_path("certutil"), "-N", "-d", db_name, "-f", pw]
++        subprocess.check_call(cmd_args)
++
++
++def _increment_serial(serial_file: _StrOrPath) -> int:
++    fd = os.open(serial_file, os.O_RDWR | os.O_CREAT, mode=0o644)
++    try:
++        os.lockf(fd, os.F_LOCK, 0)
++        try:
++            with os.fdopen(fd, "r+", closefd=False) as sf:
++                serial_data = sf.readline()
++                if serial_data == "":
++                    serial_number = 1
++                else:
++                    serial_number = int(serial_data, 16)
++                sf.seek(0)
++                sf.write("%x\n" % (serial_number + 1,))
++
++            return serial_number
++        finally:
++            os.lockf(fd, os.F_ULOCK, 0)
++    finally:
+         os.close(fd)
+-    else:
+-        with open(options.noise_filename, 'wb') as f:
+-            f.write(random_data)
+-    return
+ 
+-def create_passwd_file(options):
+-    fd, options.passwd_filename = tempfile.mkstemp()
+-    os.write(fd, options.db_passwd.encode('utf-8'))
+-    os.close(fd)
+ 
++def _create_ca_cert(
++    db_name: str,
++    passwd_file: _StrOrPath,
++    serial_file: _StrOrPath,
++    ca_subject: str,
++    ca_nickname: str,
++    key_size: int,
++    valid_months: int,
++    ca_path_len: int,
++) -> str:
++    serial_number = _increment_serial(serial_file)
+ 
+-def db_has_cert(options, nickname):
+-    cmd_args = ['/usr/bin/certutil',
+-                '-d', options.db_name,
+-                '-L',
+-                '-n', nickname]
+-
+-    try:
+-        run_cmd(cmd_args)
+-    except CmdError as e:
+-        if e.returncode == 255 and 'not found' in e.stderr:
+-            return False
+-        else:
+-            raise
+-    return True
+-
+-def format_cert(options, nickname):
+-    cmd_args = ['/usr/bin/certutil',
+-                '-L',                          # OPERATION: list
+-                '-d', options.db_name,         # NSS database
+-                '-f', options.passwd_filename, # database password in file
+-                '-n', nickname,                # nickname of cert to list
+-                ]
+-
+-    stdout, stderr = run_cmd(cmd_args)
+-    return stdout
+-
+-#-------------------------------------------------------------------------------
+-
+-def create_database(options):
+-    if os.path.exists(options.db_dir) and not os.path.isdir(options.db_dir):
+-        raise ValueError('db_dir "%s" exists but is not a directory' % options.db_dir)
+-
+-    # Create resources
+-    create_passwd_file(options)
+-
+-    if options.clean:
+-        logging.info('Creating clean database directory: "%s"', options.db_dir)
+-
+-        if os.path.exists(options.db_dir):
+-            shutil.rmtree(options.db_dir)
+-        os.makedirs(options.db_dir)
+-
+-        cmd_args = ['/usr/bin/certutil',
+-                    '-N',                          # OPERATION: create database
+-                    '-d', options.db_name,         # NSS database
+-                    '-f', options.passwd_filename, # database password in file
+-                    ]
+-
+-        stdout, stderr = run_cmd(cmd_args)
+-    else:
+-        logging.info('Using existing database directory: "%s"', options.db_dir)
+-
+-def create_ca_cert(options):
+-    serial_number = read_serial(options)
+-    init_noise_file(options)
+-
+-    logging.info('creating ca cert: subject="%s", nickname="%s"',
+-                 options.ca_subject, options.ca_nickname)
+-
+-    cmd_args = ['/usr/bin/certutil',
+-                '-S',                            # OPERATION: create signed cert
+-                '-x',                            # self-sign the cert
+-                '-d', options.db_name,           # NSS database
+-                '-f', options.passwd_filename,   # database password in file
+-                '-n', options.ca_nickname,       # nickname of cert being created
+-                '-s', options.ca_subject,        # subject of cert being created
+-                '-g', str(options.key_size),     # keysize
+-                '-t', 'CT,,CT',                  # trust
+-                '-1',                            # add key usage extension
+-                '-2',                            # add basic contraints extension
+-                '-5',                            # add certificate type extension
+-                '-m', str(serial_number),        # cert serial number
+-                '-v', str(options.valid_months), # validity in months
+-                '-z', options.noise_filename,    # noise file random seed
+-                ]
++    logging.info('creating ca cert: subject="%s", nickname="%s"', ca_subject, ca_nickname)
+ 
+     # Provide input for extension creation prompting
+-    input = ''
++    input_data = ""
+ 
+     # >> Key Usage extension <<
+     # 0 - Digital Signature
+@@ -194,17 +90,17 @@ def create_ca_cert(options):
+     # 5 - Cert signing key
+     # 6 - CRL signing key
+     # Other to finish
+-    input += '0\n1\n5\n100\n'
++    input_data += "0\n1\n5\n100\n"
+     # Is this a critical extension [y/N]?
+-    input += 'y\n'
++    input_data += "y\n"
+ 
+     # >> Basic Constraints extension <<
+     # Is this a CA certificate [y/N]?
+-    input += 'y\n'
++    input_data += "y\n"
+     # Enter the path length constraint, enter to skip [<0 for unlimited path]: > 2
+-    input += '%d\n' % options.ca_path_len
++    input_data += "%d\n" % ca_path_len
+     # Is this a critical extension [y/N]?
+-    input += 'y\n'
++    input_data += "y\n"
+ 
+     # >> NS Cert Type extension <<
+     # 0 - SSL Client
+@@ -216,39 +112,59 @@ def create_ca_cert(options):
+     # 6 - S/MIME CA
+     # 7 - Object Signing CA
+     # Other to finish
+-    input += '5\n6\n7\n100\n'
++    input_data += "5\n6\n7\n100\n"
+     # Is this a critical extension [y/N]?
+-    input += 'n\n'
+-
+-    stdout, stderr = run_cmd(cmd_args, input)
+-    write_serial(options, serial_number + 1)
+-
+-    return options.ca_nickname
+-
+-def create_server_cert(options):
+-    serial_number = read_serial(options)
+-    init_noise_file(options)
+-
+-    logging.info('creating server cert: subject="%s", nickname="%s"',
+-                 options.server_subject, options.server_nickname)
+-
+-    cmd_args = ['/usr/bin/certutil',
+-                '-S',                            # OPERATION: create signed cert
+-                '-d', options.db_name,           # NSS database
+-                '-f', options.passwd_filename,   # database password in file
+-                '-c', options.ca_nickname,       # nickname of CA used to sign this cert
+-                '-n', options.server_nickname,   # nickname of cert being created
+-                '-s', options.server_subject,    # subject of cert being created
+-                '-g', str(options.key_size),     # keysize
+-                '-t', 'u,u,u',                   # trust
+-                '-5',                            # add certificate type extensionn
+-                '-m', str(serial_number),        # cert serial number
+-                '-v', str(options.valid_months), # validity in months
+-                '-z', options.noise_filename,    # noise file random seed
+-                ]
++    input_data += "n\n"
++
++    with _noise_file() as nf:
++        cmd_args = [
++            resolve_path("certutil"),
++            "-S",  # OPERATION: create signed cert
++            "-x",  # self-sign the cert
++            "-d",
++            db_name,  # NSS database
++            "-f",
++            passwd_file,  # database password in file
++            "-n",
++            ca_nickname,  # nickname of cert being created
++            "-s",
++            ca_subject,  # subject of cert being created
++            "-g",
++            str(key_size),  # keysize
++            "-t",
++            "CT,,CT",  # trust
++            "-1",  # add key usage extension
++            "-2",  # add basic contraints extension
++            "-5",  # add certificate type extension
++            "-m",
++            str(serial_number),  # cert serial number
++            "-v",
++            str(valid_months),  # validity in months
++            "-z",
++            nf,  # noise file random seed
++        ]
++
++        subprocess.run(cmd_args, input=input_data.encode("utf-8"), check=True)
++
++    return ca_nickname
++
++
++def _create_server_cert(
++    db_name: str,
++    passwd_file: _StrOrPath,
++    serial_file: _StrOrPath,
++    ca_nickname: str,
++    server_subject: str,
++    server_nickname: str,
++    key_size: int,
++    valid_months: int,
++) -> str:
++    serial_number = _increment_serial(serial_file)
++
++    logging.info('creating server cert: subject="%s", nickname="%s"', server_subject, server_nickname)
+ 
+     # Provide input for extension creation prompting
+-    input = ''
++    input_data = ""
+ 
+     # >> NS Cert Type extension <<
+     # 0 - SSL Client
+@@ -260,39 +176,58 @@ def create_server_cert(options):
+     # 6 - S/MIME CA
+     # 7 - Object Signing CA
+     # Other to finish
+-    input += '1\n100\n'
++    input_data += "1\n100\n"
+     # Is this a critical extension [y/N]?
+-    input += 'n\n'
+-
+-    stdout, stderr = run_cmd(cmd_args, input)
+-    write_serial(options, serial_number + 1)
+-
+-    return options.server_nickname
+-
+-def create_client_cert(options):
+-    serial_number = read_serial(options)
+-    init_noise_file(options)
+-
+-    logging.info('creating client cert: subject="%s", nickname="%s"',
+-                 options.client_subject, options.client_nickname)
+-
+-    cmd_args = ['/usr/bin/certutil',
+-                '-S',                            # OPERATION: create signed cert
+-                '-d', options.db_name,           # NSS database
+-                '-f', options.passwd_filename,   # database password in file
+-                '-c', options.ca_nickname,       # nickname of CA used to sign this cert
+-                '-n', options.client_nickname,   # nickname of cert being created
+-                '-s', options.client_subject,    # subject of cert being created
+-                '-g', str(options.key_size),     # keysize
+-                '-t', 'u,u,u',                   # trust
+-                '-5',                            # add certificate type extensionn
+-                '-m', str(serial_number),        # cert serial number
+-                '-v', str(options.valid_months), # validity in months
+-                '-z', options.noise_filename,    # noise file random seed
+-                ]
++    input_data += "n\n"
++
++    with _noise_file() as nf:
++        cmd_args = [
++            resolve_path("certutil"),
++            "-S",  # OPERATION: create signed cert
++            "-d",
++            db_name,  # NSS database
++            "-f",
++            passwd_file,  # database password in file
++            "-c",
++            ca_nickname,  # nickname of CA used to sign this cert
++            "-n",
++            server_nickname,  # nickname of cert being created
++            "-s",
++            server_subject,  # subject of cert being created
++            "-g",
++            str(key_size),  # keysize
++            "-t",
++            "u,u,u",  # trust
++            "-5",  # add certificate type extensionn
++            "-m",
++            str(serial_number),  # cert serial number
++            "-v",
++            str(valid_months),  # validity in months
++            "-z",
++            nf,  # noise file random seed
++        ]
++
++        subprocess.run(cmd_args, input=input_data.encode("utf-8"), check=True)
++
++    return server_nickname
++
++
++def _create_client_cert(
++    db_name: str,
++    passwd_file: _StrOrPath,
++    serial_file: _StrOrPath,
++    ca_nickname: str,
++    client_subject: str,
++    client_nickname: str,
++    key_size: int,
++    valid_months: int,
++) -> str:
++    serial_number = _increment_serial(serial_file)
++
++    logging.info('creating client cert: subject="%s", nickname="%s"', client_subject, client_nickname)
+ 
+     # Provide input for extension creation prompting
+-    input = ''
++    input_data = ""
+ 
+     # >> NS Cert Type extension <<
+     # 0 - SSL Client
+@@ -304,46 +239,78 @@ def create_client_cert(options):
+     # 6 - S/MIME CA
+     # 7 - Object Signing CA
+     # Other to finish
+-    input += '0\n100\n'
++    input_data += "0\n100\n"
+     # Is this a critical extension [y/N]?
+-    input += 'n\n'
+-
+-    stdout, stderr = run_cmd(cmd_args, input)
+-    write_serial(options, serial_number + 1)
+-
+-    return options.client_nickname
+-
+-def add_trusted_certs(options):
+-    name = 'ca_certs'
+-    module = 'libnssckbi.so'
+-    logging.info('adding system trusted certs: name="%s" module="%s"',
+-                 name, module)
+-
+-    cmd_args = ['/usr/bin/modutil',
+-                '-dbdir', options.db_name, # NSS database
+-                '-add', name,              # module name
+-                '-libfile', module,        # module
+-                ]
+-
+-    run_cmd(cmd_args)
+-    return name
+-
+-def parse_fips_enabled(string):
+-    if re.search('FIPS mode disabled', string):
++    input_data += "n\n"
++
++    with _noise_file() as nf:
++        cmd_args = [
++            resolve_path("certutil"),
++            "-S",  # OPERATION: create signed cert
++            "-d",
++            db_name,  # NSS database
++            "-f",
++            passwd_file,  # database password in file
++            "-c",
++            ca_nickname,  # nickname of CA used to sign this cert
++            "-n",
++            client_nickname,  # nickname of cert being created
++            "-s",
++            client_subject,  # subject of cert being created
++            "-g",
++            str(key_size),  # keysize
++            "-t",
++            "u,u,u",  # trust
++            "-5",  # add certificate type extensionn
++            "-m",
++            str(serial_number),  # cert serial number
++            "-v",
++            str(valid_months),  # validity in months
++            "-z",
++            nf,  # noise file random seed
++        ]
++        print("RUNNING %s" % str(cmd_args))
++        result = subprocess.run(cmd_args, input=input_data.encode("utf-8"), check=True)
++        print("RESULT %s" % result)
++
++    return client_nickname
++
++
++def _add_trusted_certs(db_name: str):
++    name = "ca_certs"
++    module = "libnssckbi.so"
++    logging.info('adding system trusted certs: name="%s" module="%s"', name, module)
++
++    cmd_args = [
++        resolve_path("modutil"),
++        "-dbdir",
++        db_name,  # NSS database
++        "-add",
++        name,  # module name
++        "-libfile",
++        module,  # module
++    ]
++
++    subprocess.check_call(cmd_args)
++
++
++def _parse_fips_enabled(string: str):
++    if re.search("FIPS mode disabled", string):
+         return False
+-    if re.search('FIPS mode enabled', string):
++    if re.search("FIPS mode enabled", string):
+         return True
+     raise ValueError('unknown fips enabled string: "%s"' % string)
+ 
+-def get_system_fips_enabled():
+-    fips_path = '/proc/sys/crypto/fips_enabled'
++
++def _get_system_fips_enabled():
++    fips_path = "/proc/sys/crypto/fips_enabled"
+ 
+     try:
+-        with open(fips_path) as f:
++        with open(fips_path, "rb") as f:
+             data = f.read()
+-    except Exception as e:
+-        logger.warning("Unable to determine system FIPS mode: %s" % e)
+-        data = '0'
++    except OSError as e:
++        logger.warning("Unable to determine system FIPS mode: %s", e)
++        data = b"0"
+ 
+     value = int(data)
+     if value:
+@@ -352,237 +319,154 @@ def get_system_fips_enabled():
+         return False
+ 
+ 
+-def get_db_fips_enabled(db_name):
+-    cmd_args = ['/usr/bin/modutil',
+-                '-dbdir', db_name,               # NSS database
+-                '-chkfips', 'true',              # enable/disable fips
+-                ]
++def _get_db_fips_enabled(db_name: str):
++    cmd_args = [
++        resolve_path("modutil"),
++        "-dbdir",
++        db_name,  # NSS database
++        "-chkfips",
++        "true",  # enable/disable fips
++    ]
+ 
+     try:
+-        stdout, stderr = run_cmd(cmd_args)
+-        return parse_fips_enabled(stdout)
+-    except CmdError as e:
++        return _parse_fips_enabled(subprocess.check_output(cmd_args).decode("utf-8"))
++    except subprocess.CalledProcessError as e:
+         if e.returncode == FIPS_SWITCH_FAILED_ERR:
+-            return parse_fips_enabled(e.stdout)
++            return _parse_fips_enabled(e.output.decode("utf-8"))
+         else:
+             raise
+ 
+-def set_fips_mode(options):
+-    if options.fips:
+-        state = 'true'
++
++def _set_fips_mode(enable: bool, db_name: str):
++    if enable:
++        state = "true"
+     else:
+-        if get_system_fips_enabled():
++        if _get_system_fips_enabled():
+             logger.warning("System FIPS enabled, cannot disable FIPS")
+             return
+-        state = 'false'
++        state = "false"
+ 
+-    logging.info('setting fips: %s', state)
++    logging.info("setting fips: %s", state)
+ 
+-    cmd_args = ['/usr/bin/modutil',
+-                '-dbdir', options.db_name,       # NSS database
+-                '-fips', state,                  # enable/disable fips
+-                '-force'
+-                ]
++    cmd_args = [
++        resolve_path("modutil"),
++        "-dbdir",
++        db_name,  # NSS database
++        "-fips",
++        state,  # enable/disable fips
++        "-force",
++    ]
+ 
+     try:
+-        stdout, stderr = run_cmd(cmd_args)
+-    except CmdError as e:
+-        if options.fips and e.returncode == FIPS_ALREADY_ON_ERR:
++        subprocess.check_call(cmd_args)
++    except subprocess.CalledProcessError as e:
++        if enable and e.returncode == FIPS_ALREADY_ON_ERR:
+             pass
+-        elif not options.fips and e.returncode == FIPS_ALREADY_OFF_ERR:
++        elif not enable and e.returncode == FIPS_ALREADY_OFF_ERR:
+             pass
+         else:
+             raise
+-#-------------------------------------------------------------------------------
+-
+-def setup_certs(args):
+-    global logger
+-
+-    # --- cmd ---
+-    parser = argparse.ArgumentParser(description='create certs for testing',
+-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+-
+-    parser.add_argument('--verbose', action='store_true',
+-                        help='provide info level messages')
+-
+-    parser.add_argument('--debug', action='store_true',
+-                        help='provide debug level messages')
+-
+-    parser.add_argument('--quiet', action='store_true',
+-                        help='do not display any messages')
+-
+-    parser.add_argument('--show-certs', action='store_true',
+-                        help='show the certificate details')
+-
+-    parser.add_argument('--no-clean', action='store_false', dest='clean',
+-                        help='do not remove existing db_dir')
+-
+-    parser.add_argument('--no-trusted-certs', dest='add_trusted_certs', action='store_false',
+-                        help='do not add trusted certs')
+-
+-    parser.add_argument('--hostname',
+-                        help='hostname used in cert subjects')
+-
+-    parser.add_argument('--db-type',
+-                        choices=['sql', ''],
+-                        help='NSS database type')
+-
+-    parser.add_argument('--db-dir',
+-                        help='NSS database directory')
+-
+-    parser.add_argument('--db-passwd',
+-                        help='NSS database password')
+-
+-    parser.add_argument('--ca-subject',
+-                        help='CA certificate subject')
+-
+-    parser.add_argument('--ca-nickname',
+-                        help='CA certificate nickname')
+-
+-    parser.add_argument('--server-subject',
+-                        help='server certificate subject')
+-
+-    parser.add_argument('--server-nickname',
+-                        help='server certificate nickname')
+-
+-    parser.add_argument('--client-username',
+-                        help='client user name, used in client cert subject')
+-
+-    parser.add_argument('--client-subject',
+-                        help='client certificate subject')
+-
+-    parser.add_argument('--client-nickname',
+-                        help='client certificate nickname')
+-
+-    parser.add_argument('--serial-number', type=int,
+-                        help='starting serial number for certificates')
+-
+-    parser.add_argument('--valid-months', dest='valid_months', type=int,
+-                        help='validity period in months')
+-    parser.add_argument('--path-len', dest='ca_path_len', type=int,
+-                        help='basic constraints path length')
+-    parser.add_argument('--key-type', dest='key_type',
+-                        help='key type, either rsa or dsa')
+-    parser.add_argument('--key-size', dest='key_size',
+-                        help='number of bits in key (must be multiple of 8)')
+-    parser.add_argument('--serial-file', dest='serial_file',
+-                        help='name of file used to track next serial number')
+-
+-    parser.add_argument('--db-fips', action='store_true',
+-                        help='enable FIPS mode on NSS Database')
+-
+-    parser.set_defaults(verbose = False,
+-                        debug = False,
+-                        quiet = False,
+-                        show_certs = False,
+-                        clean = True,
+-                        add_trusted_certs = True,
+-                        hostname = os.uname()[1],
+-                        db_type = 'sql',
+-                        db_dir = 'pki',
+-                        db_passwd = 'DB_passwd',
+-                        ca_subject = 'CN=Test CA',
+-                        ca_nickname = 'test_ca',
+-                        server_subject =  'CN=${hostname}',
+-                        server_nickname = 'test_server',
+-                        client_username = 'test_user',
+-                        client_subject = 'CN=${client_username}',
+-                        client_nickname = '${client_username}',
+-                        serial_number = 1,
+-                        key_type = 'rsa',
+-                        key_size = 1024,
+-                        valid_months = 12,
+-                        ca_path_len = 2,
+-                        serial_file = '${db_dir}/serial',
+-                        fips = False,
+-                        )
+-
+-
+-    options = parser.parse_args(args)
+-
+-    # Do substitutions on option values.
+-    # This is ugly because argparse does not expose an API which permits iterating over
+-    # the contents of options nor a way to get the options as a dict, ugh :-(
+-    # So we access options.__dict__ directly.
+-    for key in list(options.__dict__.keys()):
+-        # Assume options never begin with underscore
+-        if key.startswith('_'):
+-            continue
+-        value = getattr(options, key)
+-        # Can't substitue on non-string values
+-        if not isinstance(value, six.string_types):
+-            continue
+-        # Don't bother trying to substitute if $ substitution character isn't present
+-        if '$' not in value:
+-            continue
+-        setattr(options, key, Template(value).substitute(options.__dict__))
+-
+-    # Set up logging
+-    log_level = logging.INFO
+-    if options.quiet:
+-        log_level = logging.ERROR
+-    if options.verbose:
+-        log_level = logging.INFO
+-    if options.debug:
+-        log_level = logging.DEBUG
+-
+-    # Initialize logging
+-    logging.basicConfig(level=log_level, format='%(levelname)s: %(message)s')
+-    logger = logging.getLogger()
+-
+-    # Synthesize some useful options derived from specified options
+-    if options.db_type == '':
+-        options.db_name = options.db_dir
+-    else:
+-        options.db_name = '%s:%s' % (options.db_type, options.db_dir)
+-    options.passwd_filename = None
+-    options.noise_filename = None
+-
+-    # Set function to clean up on exit, bind fuction with options
+-    def exit_handler_with_options():
+-        exit_handler(options)
+-    atexit.register(exit_handler_with_options)
+-
+-    cert_nicknames = []
+-
+-    try:
+-        create_database(options)
+-        set_fips_mode(options)
+-        cert_nicknames.append(create_ca_cert(options))
+-        cert_nicknames.append(create_server_cert(options))
+-        cert_nicknames.append(create_client_cert(options))
+-        if options.add_trusted_certs:
+-            add_trusted_certs(options)
+-    except CmdError as e:
+-        logging.error(e.message)
+-        logging.error(e.stderr)
+-        return 1
+-
+-    if options.show_certs:
+-        if logger.getEffectiveLevel() > logging.INFO:
+-            logger.setLevel(logging.INFO)
+-        for nickname in cert_nicknames:
+-            logging.info('Certificate nickname "%s"\n%s',
+-                         nickname, format_cert(options, nickname))
+-
+-    logging.info('---------- Summary ----------')
+-    logging.info('NSS database name="%s", password="%s"',
+-                 options.db_name, options.db_passwd)
+-    logging.info('system FIPS mode=%s', get_system_fips_enabled());
+-    logging.info('DB FIPS mode=%s', get_db_fips_enabled(options.db_name));
+-    logging.info('CA nickname="%s", CA subject="%s"',
+-                 options.ca_nickname, options.ca_subject)
+-    logging.info('server nickname="%s", server subject="%s"',
+-                 options.server_nickname, options.server_subject)
+-    logging.info('client nickname="%s", client subject="%s"',
+-                 options.client_nickname, options.client_subject)
+-
+-    return 0
+-
+-#-------------------------------------------------------------------------------
+-
+-def main():
+-    return setup_certs(None)
+-
+-if __name__ == '__main__':
+-    sys.exit(main())
++
++
++class CertificateDatabase:
++    _DB_PASSWD = "DB_passwd"
++    _DB_DIRECTORY = "pki"
++    _SERVER_NICKNAME = "test_server"
++    _CLIENT_NICKNAME = "test_user"
++    _FIPS = False
++
++    _CA_SUBJECT = "CN=Test CA"
++    _CA_NICKNAME = "test_ca"
++    _KEY_SIZE = 2048
++    _VALID_MONTHS = 12
++    _CA_PATH_LEN = 2
++    _CLIENT_SUBJECT = "CN=test_user"
++
++    def __init__(self, basedir: pathlib.Path):
++        self._db_passwd = self._DB_PASSWD
++
++        db_directory = basedir / self._DB_DIRECTORY
++        logging.info("Creating clean database directory: %s", db_directory)
++        db_directory.mkdir()
++
++        self._db_name = "sql:%s" % db_directory
++
++        self._server_nickname = self._SERVER_NICKNAME
++        self._client_nickname = self._CLIENT_NICKNAME
++        self._ca_nickname = self._CA_NICKNAME
++
++        _create_database(self.db_passwd, self._db_name)
++        _set_fips_mode(self._FIPS, self._db_name)
++
++        serial_file = db_directory / "serial"
++
++        hostname = os.uname()[1]
++        server_subject = "CN=%s" % hostname
++
++        with _passwd_file(self.db_passwd) as pwf:
++            ca_cert = _create_ca_cert(
++                self.db_name,
++                pwf,
++                serial_file,
++                self._CA_SUBJECT,
++                self.ca_nickname,
++                self._KEY_SIZE,
++                self._VALID_MONTHS,
++                self._CA_PATH_LEN,
++            )
++            server_cert = _create_server_cert(
++                self.db_name,
++                pwf,
++                serial_file,
++                ca_cert,
++                server_subject,
++                self.server_nickname,
++                self._KEY_SIZE,
++                self._VALID_MONTHS,
++            )
++            client_cert = _create_client_cert(
++                self.db_name,
++                pwf,
++                serial_file,
++                ca_cert,
++                self._CLIENT_SUBJECT,
++                self.client_nickname,
++                self._KEY_SIZE,
++                self._VALID_MONTHS,
++            )
++
++        _add_trusted_certs(self.db_name)
++
++        logging.info("---------- Summary ----------")
++        logging.info('NSS database name="%s", password="%s"', self.db_name, self.db_passwd)
++        logging.info("system FIPS mode=%s", _get_system_fips_enabled())
++        logging.info("DB FIPS mode=%s", _get_db_fips_enabled(self.db_name))
++        logging.info('CA nickname="%s", CA subject="%s"', ca_cert, self._CA_SUBJECT)
++        logging.info('server nickname="%s", server subject="%s"', server_cert, server_subject)
++        logging.info('client nickname="%s", client subject="%s"', client_cert, self._CLIENT_SUBJECT)
++
++    @property
++    def db_passwd(self):
++        return self._db_passwd
++
++    @property
++    def db_name(self):
++        return self._db_name
++
++    @property
++    def server_nickname(self):
++        return self._server_nickname
++
++    @property
++    def client_nickname(self):
++        return self._client_nickname
++
++    @property
++    def ca_nickname(self):
++        return self._ca_nickname
++
++
++@pytest.fixture(scope="class")
++def setup_certs(tmp_path_factory):
++    tmp_path = tmp_path_factory.mktemp("certdb")
++    return CertificateDatabase(tmp_path)
+diff --git a/test/test_cert_components.py b/test/test_cert_components.py
+old mode 100755
+new mode 100644
+index 9caa6e9..d5d21bc
+--- a/test/test_cert_components.py
++++ b/test/test_cert_components.py
+@@ -1,329 +1,295 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import unittest
++import pytest
+ 
+-from nss.error import NSPRError
+-import nss.error as nss_error
+ import nss.nss as nss
+ 
+-class ExceptionNotRaised(Exception):
+-    """
+-    Exception raised when an *expected* exception is *not* raised during a
+-    unit test.
+-    """
+-    msg = 'expected %s'
+ 
+-    def __init__(self, expected):
+-        self.expected = expected
+-
+-    def __str__(self):
+-        return self.msg % self.expected.__name__
+-
+-
+-class ExceptionWrongErrno(Exception):
+-    """
+-    Exception raised when an *expected* exception is raised with the wrong errno.
+-    """
+-    msg = 'expected %s with errno = %s but got errno = %s'
+-
+-    def __init__(self, expected, expected_errno, actual_errno):
+-        self.expected = expected
+-        self.expected_errno = expected_errno
+-        self.actual_errno = actual_errno
+-
+-    def __str__(self):
+-        return self.msg % (self.expected.__name__, self.expected_errno, self.actual_errno)
+-
+-
+-def assertRaisesErrno(exception, errno, callback, *args, **kw):
+-    """
+-    Tests that the expected exception is raised; raises ExceptionNotRaised
+-    if test fails.
+-    """
+-    try:
+-        callback(*args, **kw)
+-        raise ExceptionNotRaised(exception)
+-    except exception as e:
+-        if e.errno != errno:
+-            raise ExceptionWrongErrno(exception, errno, e.errno)
+-
+-
+-class TestCertName(unittest.TestCase):
+-    subject_name = 'CN=www.redhat.com,OU=Web Operations,O=Red Hat Inc,L=Raleigh,ST=North Carolina,C=US'
+-    cn_name = 'www.redhat.com'
+-    ou_name = 'Web Operations'
+-    o_name  = 'Red Hat Inc'
+-    l_name  = 'Raleigh'
+-    st_name = 'North Carolina'
+-    c_name  = 'US'
+-
+-    def setUp(self):
++class TestCertName:
++    subject_name = "CN=www.redhat.com,OU=Web Operations,O=Red Hat Inc,L=Raleigh,ST=North Carolina,C=US"
++    cn_name = "www.redhat.com"
++    ou_name = "Web Operations"
++    o_name = "Red Hat Inc"
++    l_name = "Raleigh"
++    st_name = "North Carolina"
++    c_name = "US"
++
++    @classmethod
++    def setup_class(cls):
+         nss.nss_init_nodb()
+ 
+-    def tearDown(self):
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
+ 
+     def test_ava_from_name(self):
+-        ava = nss.AVA('cn', self.cn_name)
+-        self.assertEqual(str(ava), "CN=%s" % self.cn_name)
++        ava = nss.AVA("cn", self.cn_name)
++        assert str(ava) == ("CN=%s" % self.cn_name)
+ 
+     def test_ava_from_oid_tag(self):
+         ava = nss.AVA(nss.SEC_OID_AVA_COMMON_NAME, self.cn_name)
+-        self.assertEqual(str(ava), "CN=%s" % self.cn_name)
+-        self.assertRaises(ValueError, nss.AVA, nss.SEC_OID_UNKNOWN, self.cn_name)
++        assert str(ava) == ("CN=%s" % self.cn_name)
++        with pytest.raises(ValueError):
++            nss.AVA(nss.SEC_OID_UNKNOWN, self.cn_name)
+ 
+     def test_ava_from_oid_string(self):
+-        ava = nss.AVA('2.5.4.3', self.cn_name)
+-        self.assertEqual(str(ava), "CN=%s" % self.cn_name)
+-        self.assertRaises(ValueError, nss.oid_tag, 'OID.99.99.99.99')
+-        self.assertRaises(KeyError, nss.AVA, 'foo', self.cn_name)
++        ava = nss.AVA("2.5.4.3", self.cn_name)
++        assert str(ava) == ("CN=%s" % self.cn_name)
++
++        with pytest.raises(ValueError):
++            nss.oid_tag("OID.99.99.99.99")
++
++        with pytest.raises(KeyError):
++            nss.AVA("foo", self.cn_name)
+ 
+     def test_oid_dotted_decimal(self):
+-        self.assertEqual(nss.oid_dotted_decimal(nss.SEC_OID_AVA_COMMON_NAME),
+-                         'OID.2.5.4.3')
+-        self.assertEqual(nss.oid_tag('OID.2.5.4.3'),
+-                         nss.SEC_OID_AVA_COMMON_NAME)
+-        self.assertEqual(nss.oid_tag('2.5.4.3'),
+-                         nss.SEC_OID_AVA_COMMON_NAME)
+-        self.assertRaises(ValueError, nss.oid_tag, 'OID.99.99.99.99')
++        assert nss.oid_dotted_decimal(nss.SEC_OID_AVA_COMMON_NAME) == "OID.2.5.4.3"
++        assert nss.oid_tag("OID.2.5.4.3") == nss.SEC_OID_AVA_COMMON_NAME
++        assert nss.oid_tag("2.5.4.3") == nss.SEC_OID_AVA_COMMON_NAME
++        with pytest.raises(ValueError):
++            nss.oid_tag("OID.99.99.99.99")
+ 
+     def test_ava_from_bad_type(self):
+-        self.assertRaises(TypeError, nss.AVA, (), self.cn_name)
++        with pytest.raises(TypeError):
++            nss.AVA((), self.cn_name)
+ 
+     def test_ava_compare(self):
+-        cn_ava1 = nss.AVA('cn', self.cn_name)
+-        cn_ava2 = nss.AVA('cn', self.cn_name)
+-        cn_ava3 = nss.AVA('cn', self.cn_name+'A')
+-        ou_ava = nss.AVA('ou', self.ou_name)
++        cn_ava1 = nss.AVA("cn", self.cn_name)
++        cn_ava2 = nss.AVA("cn", self.cn_name)
++        cn_ava3 = nss.AVA("cn", self.cn_name + "A")
++        ou_ava = nss.AVA("ou", self.ou_name)
+ 
+-        self.assertTrue(cn_ava1 == cn_ava2)
+-        self.assertTrue(cn_ava1 < ou_ava)
+-        self.assertTrue(cn_ava1 < cn_ava3)
++        assert cn_ava1 == cn_ava2
++        assert cn_ava1 < ou_ava
++        assert cn_ava1 < cn_ava3
+ 
+     def test_rdn_compare(self):
+-        cn_rdn1 = nss.RDN(nss.AVA('cn', self.cn_name))
+-        cn_rdn2 = nss.RDN(nss.AVA('cn', self.cn_name))
+-        cn_rdn3 = nss.RDN(nss.AVA('cn', self.cn_name+'A'))
+-        ou_rdn  = nss.RDN(nss.AVA('ou', self.ou_name))
++        cn_rdn1 = nss.RDN(nss.AVA("cn", self.cn_name))
++        cn_rdn2 = nss.RDN(nss.AVA("cn", self.cn_name))
++        cn_rdn3 = nss.RDN(nss.AVA("cn", self.cn_name + "A"))
++        ou_rdn = nss.RDN(nss.AVA("ou", self.ou_name))
+ 
+-        self.assertTrue(cn_rdn1 == cn_rdn2)
+-        self.assertTrue(cn_rdn1 < ou_rdn)
+-        self.assertTrue(cn_rdn1 < cn_rdn3)
++        assert cn_rdn1 == cn_rdn2
++        assert cn_rdn1 < ou_rdn
++        assert cn_rdn1 < cn_rdn3
+ 
+     def test_rdn_create(self):
+-        cn_ava = nss.AVA('cn', self.cn_name)
+-        ou_ava = nss.AVA('ou', self.ou_name)
++        cn_ava = nss.AVA("cn", self.cn_name)
++        ou_ava = nss.AVA("ou", self.ou_name)
+ 
+         rdn = nss.RDN()
+-        self.assertEqual(len(rdn), 0)
+-        self.assertEqual(str(rdn), '')
++        assert len(rdn) == 0
++        assert str(rdn) == ""
+ 
+         rdn = nss.RDN(cn_ava)
+-        self.assertEqual(len(rdn), 1)
+-        self.assertEqual(str(rdn), 'CN=%s' % (self.cn_name))
+-        self.assertEqual(rdn[0], cn_ava)
+-        self.assertEqual(rdn['cn'], [cn_ava])
++        assert len(rdn) == 1
++        assert str(rdn) == ("CN=%s" % self.cn_name)
++        assert rdn[0] == cn_ava
++        assert rdn["cn"] == [cn_ava]
+ 
+         rdn = nss.RDN(cn_ava, ou_ava)
+-        self.assertEqual(len(rdn), 2)
+-        self.assertEqual(str(rdn), 'CN=%s+OU=%s' % (self.cn_name, self.ou_name))
++        assert len(rdn) == 2
++        assert str(rdn) == ("CN=%s+OU=%s" % (self.cn_name, self.ou_name))
+ 
+-        self.assertEqual(rdn[0], cn_ava)
+-        self.assertEqual(rdn[1], ou_ava)
++        assert rdn[0] == cn_ava
++        assert rdn[1] == ou_ava
+ 
+         i = 0
+         for ava in rdn:
+-            if   i == 0: self.assertEqual(ava, cn_ava)
+-            elif i == 1: self.assertEqual(ava, ou_ava)
+-            else: self.fail("excess ava's")
++            if i == 0:
++                assert ava == cn_ava
++            elif i == 1:
++                assert ava == ou_ava
++            else:
++                pytest.fail("excess ava's")
+             i += 1
+ 
+-        self.assertEqual(list(rdn), [cn_ava, ou_ava])
+-        self.assertEqual(rdn[:],    [cn_ava, ou_ava])
++        assert list(rdn) == [cn_ava, ou_ava]
++        assert rdn[:] == [cn_ava, ou_ava]
+ 
+-        self.assertEqual(rdn['cn'], [cn_ava])
+-        self.assertEqual(rdn['ou'], [ou_ava])
++        assert rdn["cn"] == [cn_ava]
++        assert rdn["ou"] == [ou_ava]
+ 
+-        self.assertEqual(str(rdn[0]), "CN=%s" % self.cn_name)
+-        self.assertEqual(str(rdn[1]), "OU=%s" % self.ou_name)
++        assert str(rdn[0]) == "CN=%s" % self.cn_name
++        assert str(rdn[1]) == "OU=%s" % self.ou_name
+ 
+-        self.assertEqual(rdn['2.5.4.3'], [cn_ava])
++        assert rdn["2.5.4.3"] == [cn_ava]
+ 
+-        self.assertEqual(rdn.has_key('cn'), True)
+-        self.assertEqual('cn' in rdn, True)
++        assert rdn.has_key("cn")
++        assert "cn" in rdn
+ 
+-        self.assertEqual(rdn.has_key('2.5.4.3'), True)
+-        self.assertEqual('2.5.4.3' in rdn, True)
++        assert rdn.has_key("2.5.4.3")
++        assert "2.5.4.3" in rdn
+ 
+-        self.assertEqual(rdn.has_key('st'), False)
+-        self.assertEqual('st' in rdn, False)
++        assert not rdn.has_key("st")
++        assert "st" not in rdn
+ 
+-        self.assertEqual(list(rdn), [cn_ava, ou_ava])
+-        self.assertEqual(rdn[0:2], [cn_ava, ou_ava])
++        assert list(rdn) == [cn_ava, ou_ava]
++        assert rdn[0:2] == [cn_ava, ou_ava]
+ 
+         i = 0
+         for ava in rdn:
+-            if i == 0: self.assertEqual(rdn[i], cn_ava)
+-            if i == 1: self.assertEqual(rdn[i], ou_ava)
++            if i == 0:
++                assert rdn[i] == cn_ava
++            if i == 1:
++                assert rdn[i] == ou_ava
++            i = i + 1
+ 
+-        try:
+-            rdn['st']
+-            self.fail("expected KeyError for 'st'")
+-        except KeyError:
+-            pass
++        with pytest.raises(KeyError):
++            _ = rdn["st"]
+ 
+-        try:
+-            rdn['junk']
+-            self.fail("expected KeyError for 'junk'")
+-        except KeyError:
+-            pass
++        with pytest.raises(KeyError):
++            _ = rdn["junk"]
+ 
+     def test_name(self):
+-        cn_rdn = nss.RDN(nss.AVA('cn', self.cn_name))
+-        ou_rdn = nss.RDN(nss.AVA('ou', self.ou_name))
+-        o_rdn  = nss.RDN(nss.AVA('o',  self.o_name))
+-        l_rdn  = nss.RDN(nss.AVA('l',  self.l_name))
+-        st_rdn = nss.RDN(nss.AVA('st', self.st_name))
+-        c_rdn  = nss.RDN(nss.AVA('c',  self.c_name))
++        cn_rdn = nss.RDN(nss.AVA("cn", self.cn_name))
++        ou_rdn = nss.RDN(nss.AVA("ou", self.ou_name))
++        o_rdn = nss.RDN(nss.AVA("o", self.o_name))
++        l_rdn = nss.RDN(nss.AVA("l", self.l_name))
++        st_rdn = nss.RDN(nss.AVA("st", self.st_name))
++        c_rdn = nss.RDN(nss.AVA("c", self.c_name))
+ 
+         name = nss.DN(self.subject_name)
+-        self.assertEqual(str(name), self.subject_name)
++        assert str(name) == self.subject_name
+ 
+-        self.assertEqual(name[0], c_rdn)
+-        self.assertEqual(name[1], st_rdn)
+-        self.assertEqual(name[2], l_rdn)
+-        self.assertEqual(name[3], o_rdn)
+-        self.assertEqual(name[4], ou_rdn)
+-        self.assertEqual(name[5], cn_rdn)
++        assert name[0] == c_rdn
++        assert name[1] == st_rdn
++        assert name[2] == l_rdn
++        assert name[3] == o_rdn
++        assert name[4] == ou_rdn
++        assert name[5] == cn_rdn
+ 
+-        self.assertEqual(len(name), 6)
++        assert len(name) == 6
+ 
+         i = 0
+         for rdn in name:
+-            if   i == 0: self.assertEqual(rdn, c_rdn)
+-            elif i == 1: self.assertEqual(rdn, st_rdn)
+-            elif i == 2: self.assertEqual(rdn, l_rdn)
+-            elif i == 3: self.assertEqual(rdn, o_rdn)
+-            elif i == 4: self.assertEqual(rdn, ou_rdn)
+-            elif i == 5: self.assertEqual(rdn, cn_rdn)
+-            else: self.fail("excess rdn's")
++            if i == 0:
++                assert rdn == c_rdn
++            elif i == 1:
++                assert rdn == st_rdn
++            elif i == 2:
++                assert rdn == l_rdn
++            elif i == 3:
++                assert rdn == o_rdn
++            elif i == 4:
++                assert rdn == ou_rdn
++            elif i == 5:
++                assert rdn == cn_rdn
++            else:
++                pytest.fail("excess rdn's")
+             i += 1
+ 
+-        self.assertEqual(list(name), [c_rdn, st_rdn, l_rdn, o_rdn, ou_rdn, cn_rdn])
+-        self.assertEqual(name[:],    [c_rdn, st_rdn, l_rdn, o_rdn, ou_rdn, cn_rdn])
++        assert list(name) == [c_rdn, st_rdn, l_rdn, o_rdn, ou_rdn, cn_rdn]
++        assert name[:] == [c_rdn, st_rdn, l_rdn, o_rdn, ou_rdn, cn_rdn]
+ 
+-        self.assertEqual(name['c'],  [c_rdn])
+-        self.assertEqual(name['st'], [st_rdn])
+-        self.assertEqual(name['l'],  [l_rdn])
+-        self.assertEqual(name['o'],  [o_rdn])
+-        self.assertEqual(name['ou'], [ou_rdn])
+-        self.assertEqual(name['cn'], [cn_rdn])
++        assert name["c"] == [c_rdn]
++        assert name["st"] == [st_rdn]
++        assert name["l"] == [l_rdn]
++        assert name["o"] == [o_rdn]
++        assert name["ou"] == [ou_rdn]
++        assert name["cn"] == [cn_rdn]
+ 
+-        self.assertEqual(name.email_address, None)
+-        self.assertEqual(name.common_name, self.cn_name)
+-        self.assertEqual(name.country_name, self.c_name)
+-        self.assertEqual(name.locality_name, self.l_name)
+-        self.assertEqual(name.state_name, self.st_name)
+-        self.assertEqual(name.org_name, self.o_name)
+-        self.assertEqual(name.dc_name, None)
+-        self.assertEqual(name.org_unit_name, self.ou_name)
+-        self.assertEqual(name.cert_uid, None)
++        assert name.email_address is None
++        assert name.common_name == self.cn_name
++        assert name.country_name == self.c_name
++        assert name.locality_name == self.l_name
++        assert name.state_name == self.st_name
++        assert name.org_name == self.o_name
++        assert name.dc_name is None
++        assert name.org_unit_name == self.ou_name
++        assert name.cert_uid is None
+ 
+         name = nss.DN()
+-        self.assertEqual(str(name), '')
++        assert str(name) == ""
+ 
+         name = nss.DN([])
+-        self.assertEqual(str(name), '')
++        assert str(name) == ""
+ 
+         name = nss.DN(())
+-        self.assertEqual(str(name), '')
++        assert str(name) == ""
+ 
+-        name = nss.DN('')
+-        self.assertEqual(str(name), '')
++        name = nss.DN("")
++        assert str(name) == ""
+ 
+-        self.assertRaises(TypeError, nss.DN, 1)
++        with pytest.raises(TypeError):
++            nss.DN(1)
+ 
+         name.add_rdn(cn_rdn)
+-        self.assertEqual(name[0], cn_rdn)
+-        self.assertEqual(name['cn'], [cn_rdn])
+-        self.assertEqual(str(name), 'CN=%s' % self.cn_name)
++        assert name[0] == cn_rdn
++        assert name["cn"] == [cn_rdn]
++        assert str(name) == ("CN=%s" % self.cn_name)
+ 
+         name.add_rdn(ou_rdn)
+-        self.assertEqual(name[0], cn_rdn)
+-        self.assertEqual(name[1], ou_rdn)
+-        self.assertEqual(name['cn'], [cn_rdn])
+-        self.assertEqual(name['ou'], [ou_rdn])
+-        self.assertEqual(str(name), 'OU=%s,CN=%s' % (self.ou_name,self.cn_name))
++        assert name[0] == cn_rdn
++        assert name[1] == ou_rdn
++        assert name["cn"] == [cn_rdn]
++        assert name["ou"] == [ou_rdn]
++        assert str(name) == ("OU=%s,CN=%s" % (self.ou_name, self.cn_name))
+ 
+         name = nss.DN(cn_rdn, ou_rdn)
+-        self.assertEqual(name[0], cn_rdn)
+-        self.assertEqual(name[1], ou_rdn)
+-        self.assertEqual(name['cn'], [cn_rdn])
+-        self.assertEqual(name['ou'], [ou_rdn])
+-        self.assertEqual(str(name), 'OU=%s,CN=%s' % (self.ou_name,self.cn_name))
++        assert name[0] == cn_rdn
++        assert name[1] == ou_rdn
++        assert name["cn"] == [cn_rdn]
++        assert name["ou"] == [ou_rdn]
++        assert str(name) == ("OU=%s,CN=%s" % (self.ou_name, self.cn_name))
+ 
+-        self.assertEqual(name.has_key('cn'), True)
+-        self.assertEqual('cn' in name, True)
++        assert name.has_key("cn")
++        assert "cn" in name
+ 
+-        self.assertEqual(name.has_key('ou'), True)
+-        self.assertEqual('ou' in name, True)
++        assert name.has_key("ou")
++        assert "ou" in name
+ 
+-        self.assertEqual(name.has_key('st'), False)
+-        self.assertEqual('st' in name, False)
++        assert not name.has_key("st")
++        assert "st" not in name
+ 
+     def test_oid(self):
+-        self.assertEqual(nss.oid_str('2.5.4.3'),                   'X520 Common Name')
+-        self.assertEqual(nss.oid_str(nss.SEC_OID_AVA_COMMON_NAME), 'X520 Common Name')
+-        self.assertEqual(nss.oid_str('SEC_OID_AVA_COMMON_NAME'),   'X520 Common Name')
+-        self.assertEqual(nss.oid_str('AVA_COMMON_NAME'),           'X520 Common Name')
+-        self.assertEqual(nss.oid_str('cn'),                        'X520 Common Name')
++        assert nss.oid_str("2.5.4.3") == "X520 Common Name"
++        assert nss.oid_str(nss.SEC_OID_AVA_COMMON_NAME) == "X520 Common Name"
++        assert nss.oid_str("SEC_OID_AVA_COMMON_NAME") == "X520 Common Name"
++        assert nss.oid_str("AVA_COMMON_NAME") == "X520 Common Name"
++        assert nss.oid_str("cn") == "X520 Common Name"
+ 
+-        self.assertEqual(nss.oid_tag_name('2.5.4.3'),                   'SEC_OID_AVA_COMMON_NAME')
+-        self.assertEqual(nss.oid_tag_name(nss.SEC_OID_AVA_COMMON_NAME), 'SEC_OID_AVA_COMMON_NAME')
+-        self.assertEqual(nss.oid_tag_name('SEC_OID_AVA_COMMON_NAME'),   'SEC_OID_AVA_COMMON_NAME')
+-        self.assertEqual(nss.oid_tag_name('AVA_COMMON_NAME'),           'SEC_OID_AVA_COMMON_NAME')
+-        self.assertEqual(nss.oid_tag_name('cn'),                        'SEC_OID_AVA_COMMON_NAME')
++        assert nss.oid_tag_name("2.5.4.3") == "SEC_OID_AVA_COMMON_NAME"
++        assert nss.oid_tag_name(nss.SEC_OID_AVA_COMMON_NAME) == "SEC_OID_AVA_COMMON_NAME"
++        assert nss.oid_tag_name("SEC_OID_AVA_COMMON_NAME") == "SEC_OID_AVA_COMMON_NAME"
++        assert nss.oid_tag_name("AVA_COMMON_NAME") == "SEC_OID_AVA_COMMON_NAME"
++        assert nss.oid_tag_name("cn") == "SEC_OID_AVA_COMMON_NAME"
+ 
+-        self.assertEqual(nss.oid_dotted_decimal('2.5.4.3'),                   'OID.2.5.4.3')
+-        self.assertEqual(nss.oid_dotted_decimal(nss.SEC_OID_AVA_COMMON_NAME), 'OID.2.5.4.3')
+-        self.assertEqual(nss.oid_dotted_decimal('SEC_OID_AVA_COMMON_NAME'),   'OID.2.5.4.3')
+-        self.assertEqual(nss.oid_dotted_decimal('AVA_COMMON_NAME'),           'OID.2.5.4.3')
+-        self.assertEqual(nss.oid_dotted_decimal('cn'),                        'OID.2.5.4.3')
++        assert nss.oid_dotted_decimal("2.5.4.3") == "OID.2.5.4.3"
++        assert nss.oid_dotted_decimal(nss.SEC_OID_AVA_COMMON_NAME) == "OID.2.5.4.3"
++        assert nss.oid_dotted_decimal("SEC_OID_AVA_COMMON_NAME") == "OID.2.5.4.3"
++        assert nss.oid_dotted_decimal("AVA_COMMON_NAME") == "OID.2.5.4.3"
++        assert nss.oid_dotted_decimal("cn") == "OID.2.5.4.3"
+ 
+-        self.assertEqual(nss.oid_tag('2.5.4.3'),                   nss.SEC_OID_AVA_COMMON_NAME)
+-        self.assertEqual(nss.oid_tag(nss.SEC_OID_AVA_COMMON_NAME), nss.SEC_OID_AVA_COMMON_NAME)
+-        self.assertEqual(nss.oid_tag('SEC_OID_AVA_COMMON_NAME'),   nss.SEC_OID_AVA_COMMON_NAME)
+-        self.assertEqual(nss.oid_tag('AVA_COMMON_NAME'),           nss.SEC_OID_AVA_COMMON_NAME)
+-        self.assertEqual(nss.oid_tag('cn'),                        nss.SEC_OID_AVA_COMMON_NAME)
++        assert nss.oid_tag("2.5.4.3") == nss.SEC_OID_AVA_COMMON_NAME
++        assert nss.oid_tag(nss.SEC_OID_AVA_COMMON_NAME) == nss.SEC_OID_AVA_COMMON_NAME
++        assert nss.oid_tag("SEC_OID_AVA_COMMON_NAME") == nss.SEC_OID_AVA_COMMON_NAME
++        assert nss.oid_tag("AVA_COMMON_NAME") == nss.SEC_OID_AVA_COMMON_NAME
++        assert nss.oid_tag("cn") == nss.SEC_OID_AVA_COMMON_NAME
+ 
+     def test_multi_value(self):
+-        subject='CN=www.redhat.com,OU=engineering,OU=boston+OU=westford,C=US'
+-        cn_ava   = nss.AVA('cn', self.cn_name)
+-        ou1_ava1 = nss.AVA('ou', 'boston')
+-        ou1_ava2 = nss.AVA('ou', 'westford')
+-        ou2_ava1 = nss.AVA('ou', 'engineering')
+-        c_ava    = nss.AVA('c',  self.c_name)
++        subject = "CN=www.redhat.com,OU=engineering,OU=boston+OU=westford,C=US"
++        cn_ava = nss.AVA("cn", self.cn_name)
++        ou1_ava1 = nss.AVA("ou", "boston")
++        ou1_ava2 = nss.AVA("ou", "westford")
++        ou2_ava1 = nss.AVA("ou", "engineering")
++        c_ava = nss.AVA("c", self.c_name)
+ 
+-        cn_rdn  = nss.RDN(cn_ava)
++        cn_rdn = nss.RDN(cn_ava)
+         ou1_rdn = nss.RDN(ou1_ava1, ou1_ava2)
+         ou2_rdn = nss.RDN(ou2_ava1)
+-        c_rdn   = nss.RDN(c_ava)
++        c_rdn = nss.RDN(c_ava)
+ 
+         name = nss.DN(subject)
+ 
+-        self.assertEqual(len(name), 4)
++        assert len(name) == 4
+ 
+-        self.assertEqual(name['cn'], [cn_rdn])
+-        self.assertEqual(name['ou'], [ou1_rdn, ou2_rdn])
+-        self.assertEqual(name['c'],  [c_rdn])
++        assert name["cn"] == [cn_rdn]
++        assert name["ou"] == [ou1_rdn, ou2_rdn]
++        assert name["c"] == [c_rdn]
+ 
+-        rdn = name['ou'][0]
+-        self.assertEqual(len(rdn), 2)
+-        self.assertEqual(rdn, ou1_rdn)
+-        self.assertEqual(rdn[0], ou1_ava1)
+-        self.assertEqual(rdn[1], ou1_ava2)
+-        self.assertEqual(list(rdn), [ou1_ava1, ou1_ava2])
+-        self.assertEqual(rdn[:], [ou1_ava1, ou1_ava2])
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        rdn = name["ou"][0]
++        assert len(rdn) == 2
++        assert rdn == ou1_rdn
++        assert rdn[0] == ou1_ava1
++        assert rdn[1] == ou1_ava2
++        assert list(rdn) == [ou1_ava1, ou1_ava2]
++        assert rdn[:] == [ou1_ava1, ou1_ava2]
+diff --git a/test/test_cert_request.py b/test/test_cert_request.py
+old mode 100755
+new mode 100644
+index 3d2e0fb..67b0c92
+--- a/test/test_cert_request.py
++++ b/test/test_cert_request.py
+@@ -1,92 +1,83 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import unittest
+-
+-from nss.error import NSPRError
+-import nss.error as nss_error
+ import nss.nss as nss
+ 
+-'''
+-
+-This test assures we can load a CSR (Certificate Signing Request) and
+-properly extract it's contents. A test CSR was generated and below is
+-the output from OpenSSL's parsing of that CSR. We deliberately used
+-OpenSSL rather than NSS to dump the CSR out in text form because using
+-a different implementation helps assure our implementation agrees.
+-
+-
+-% openssl req -in test.pem -text
+-Certificate Request:
+-    Data:
+-        Version: 0 (0x0)
+-        Subject: CN=localhost
+-        Subject Public Key Info:
+-            Public Key Algorithm: rsaEncryption
+-                Public-Key: (2048 bit)
+-                Modulus:
+-                    00:d5:7a:f8:57:ea:d9:4c:02:c3:ee:3c:87:c4:fb:
+-                    f0:03:c0:7e:ca:6c:aa:b4:51:7c:84:29:a5:89:9c:
+-                    82:17:ed:11:90:c0:ff:3d:d5:c3:13:88:09:bf:6b:
+-                    d3:59:01:42:00:eb:89:a5:8b:11:2d:4c:ac:f8:c3:
+-                    7b:ca:4f:11:2a:69:84:d5:98:c8:38:4e:8a:9c:17:
+-                    bb:e7:ab:7e:96:8b:78:4b:f5:db:50:c3:ce:e3:4b:
+-                    71:6c:77:10:81:96:22:26:ee:72:e0:7d:56:d6:03:
+-                    a5:63:35:dd:25:f8:60:18:28:37:46:85:1c:2b:ad:
+-                    99:df:ec:b7:b3:d9:9c:e2:ca:bc:7a:47:89:a6:cf:
+-                    4b:2c:45:41:12:a1:3e:fa:7e:1a:d8:aa:92:5e:a7:
+-                    17:89:3f:fd:8b:e3:9f:29:c4:46:42:a3:ef:3b:72:
+-                    eb:78:c4:30:40:af:08:51:22:79:57:3f:21:5c:1e:
+-                    3f:26:56:25:23:61:21:26:87:65:22:8d:9a:f2:9c:
+-                    72:99:19:6b:d6:82:16:14:5f:ba:31:14:02:c3:69:
+-                    20:5d:40:a3:f2:6a:b3:ef:17:32:39:98:b2:f2:65:
+-                    15:1d:58:58:96:75:39:36:a6:13:70:9d:b2:d0:dd:
+-                    ba:0e:aa:c8:33:9a:b3:c2:00:bc:28:4f:f5:a5:5c:
+-                    48:7d
+-                Exponent: 65537 (0x10001)
+-        Attributes:
+-            friendlyName             :Test
+-        Requested Extensions:
+-            X509v3 Basic Constraints: critical
+-                CA:FALSE
+-            X509v3 Subject Key Identifier:
+-                8B:84:44:E2:3B:21:CD:54:37:95:2D:B7:E8:D1:B1:D8:0E:96:56:10
+-    Signature Algorithm: sha256WithRSAEncryption
+-         97:1c:5f:8c:27:35:fd:78:8f:76:a0:a0:be:43:54:be:62:54:
+-         50:db:33:58:92:d8:5e:28:b1:59:9b:8f:2d:0a:8e:7f:63:a6:
+-         05:52:60:0c:7b:46:90:ef:01:a4:09:96:66:56:59:fa:15:d0:
+-         3e:eb:08:d6:db:0a:b7:78:c2:57:97:02:75:63:8d:19:d8:b2:
+-         cc:d0:0c:84:e4:c0:86:86:b4:62:11:9c:c4:48:b2:51:67:29:
+-         02:ab:7a:7e:e0:12:01:c1:ba:96:b3:e1:91:85:98:70:90:5f:
+-         57:7b:1b:23:97:c1:d7:0b:2d:1e:e4:b8:15:c0:27:63:74:8f:
+-         0f:2d:e1:91:a8:4f:da:f2:65:2d:7b:c8:c6:1e:43:93:7a:22:
+-         07:a2:71:1c:b9:d3:63:c5:bc:24:d0:7a:ab:7a:74:b1:d8:40:
+-         e0:2a:21:2d:42:1e:5c:6d:ae:06:11:06:6f:d1:ec:b4:e5:d7:
+-         74:9d:92:85:3d:0d:0a:3d:59:93:51:7d:e7:13:1e:db:48:3b:
+-         3a:d2:96:3d:50:f4:84:21:91:76:56:72:c5:22:ac:96:57:42:
+-         dc:cd:bc:a5:b4:0d:5c:95:d8:a2:a5:49:6f:ae:10:a8:f5:b0:
+-         ad:30:b6:03:5e:14:71:50:be:1c:61:6d:3e:5c:be:7d:a4:ae:
+-         b4:be:b9:3d
+------BEGIN CERTIFICATE REQUEST-----
+-MIICrzCCAZcCAQAwFDESMBAGA1UEAxMJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0B
+-AQEFAAOCAQ8AMIIBCgKCAQEA1Xr4V+rZTALD7jyHxPvwA8B+ymyqtFF8hCmliZyC
+-F+0RkMD/PdXDE4gJv2vTWQFCAOuJpYsRLUys+MN7yk8RKmmE1ZjIOE6KnBe756t+
+-lot4S/XbUMPO40txbHcQgZYiJu5y4H1W1gOlYzXdJfhgGCg3RoUcK62Z3+y3s9mc
+-4sq8ekeJps9LLEVBEqE++n4a2KqSXqcXiT/9i+OfKcRGQqPvO3LreMQwQK8IUSJ5
+-Vz8hXB4/JlYlI2EhJodlIo2a8pxymRlr1oIWFF+6MRQCw2kgXUCj8mqz7xcyOZiy
+-8mUVHVhYlnU5NqYTcJ2y0N26DqrIM5qzwgC8KE/1pVxIfQIDAQABoFYwEwYJKoZI
+-hvcNAQkUMQYTBFRlc3QwPwYJKoZIhvcNAQkOMTIwMDAMBgNVHRMBAf8EAjAAMCAG
+-A1UdDgEBAAQWBBSLhETiOyHNVDeVLbfo0bHYDpZWEDANBgkqhkiG9w0BAQsFAAOC
+-AQEAlxxfjCc1/XiPdqCgvkNUvmJUUNszWJLYXiixWZuPLQqOf2OmBVJgDHtGkO8B
+-pAmWZlZZ+hXQPusI1tsKt3jCV5cCdWONGdiyzNAMhOTAhoa0YhGcxEiyUWcpAqt6
+-fuASAcG6lrPhkYWYcJBfV3sbI5fB1wstHuS4FcAnY3SPDy3hkahP2vJlLXvIxh5D
+-k3oiB6JxHLnTY8W8JNB6q3p0sdhA4CohLUIeXG2uBhEGb9HstOXXdJ2ShT0NCj1Z
+-k1F95xMe20g7OtKWPVD0hCGRdlZyxSKslldC3M28pbQNXJXYoqVJb64QqPWwrTC2
+-A14UcVC+HGFtPly+faSutL65PQ==
+------END CERTIFICATE REQUEST-----
+-'''
++# This test assures we can load a CSR (Certificate Signing Request) and
++# properly extract it's contents. A test CSR was generated and below is
++# the output from OpenSSL's parsing of that CSR. We deliberately used
++# OpenSSL rather than NSS to dump the CSR out in text form because using
++# a different implementation helps assure our implementation agrees.
++#
++#
++# % openssl req -in test.pem -text
++# Certificate Request:
++#     Data:
++#         Version: 0 (0x0)
++#         Subject: CN=localhost
++#         Subject Public Key Info:
++#             Public Key Algorithm: rsaEncryption
++#                 Public-Key: (2048 bit)
++#                 Modulus:
++#                     00:d5:7a:f8:57:ea:d9:4c:02:c3:ee:3c:87:c4:fb:
++#                     f0:03:c0:7e:ca:6c:aa:b4:51:7c:84:29:a5:89:9c:
++#                     82:17:ed:11:90:c0:ff:3d:d5:c3:13:88:09:bf:6b:
++#                     d3:59:01:42:00:eb:89:a5:8b:11:2d:4c:ac:f8:c3:
++#                     7b:ca:4f:11:2a:69:84:d5:98:c8:38:4e:8a:9c:17:
++#                     bb:e7:ab:7e:96:8b:78:4b:f5:db:50:c3:ce:e3:4b:
++#                     71:6c:77:10:81:96:22:26:ee:72:e0:7d:56:d6:03:
++#                     a5:63:35:dd:25:f8:60:18:28:37:46:85:1c:2b:ad:
++#                     99:df:ec:b7:b3:d9:9c:e2:ca:bc:7a:47:89:a6:cf:
++#                     4b:2c:45:41:12:a1:3e:fa:7e:1a:d8:aa:92:5e:a7:
++#                     17:89:3f:fd:8b:e3:9f:29:c4:46:42:a3:ef:3b:72:
++#                     eb:78:c4:30:40:af:08:51:22:79:57:3f:21:5c:1e:
++#                     3f:26:56:25:23:61:21:26:87:65:22:8d:9a:f2:9c:
++#                     72:99:19:6b:d6:82:16:14:5f:ba:31:14:02:c3:69:
++#                     20:5d:40:a3:f2:6a:b3:ef:17:32:39:98:b2:f2:65:
++#                     15:1d:58:58:96:75:39:36:a6:13:70:9d:b2:d0:dd:
++#                     ba:0e:aa:c8:33:9a:b3:c2:00:bc:28:4f:f5:a5:5c:
++#                     48:7d
++#                 Exponent: 65537 (0x10001)
++#         Attributes:
++#             friendlyName             :Test
++#         Requested Extensions:
++#             X509v3 Basic Constraints: critical
++#                 CA:FALSE
++#             X509v3 Subject Key Identifier:
++#                 8B:84:44:E2:3B:21:CD:54:37:95:2D:B7:E8:D1:B1:D8:0E:96:56:10
++#     Signature Algorithm: sha256WithRSAEncryption
++#          97:1c:5f:8c:27:35:fd:78:8f:76:a0:a0:be:43:54:be:62:54:
++#          50:db:33:58:92:d8:5e:28:b1:59:9b:8f:2d:0a:8e:7f:63:a6:
++#          05:52:60:0c:7b:46:90:ef:01:a4:09:96:66:56:59:fa:15:d0:
++#          3e:eb:08:d6:db:0a:b7:78:c2:57:97:02:75:63:8d:19:d8:b2:
++#          cc:d0:0c:84:e4:c0:86:86:b4:62:11:9c:c4:48:b2:51:67:29:
++#          02:ab:7a:7e:e0:12:01:c1:ba:96:b3:e1:91:85:98:70:90:5f:
++#          57:7b:1b:23:97:c1:d7:0b:2d:1e:e4:b8:15:c0:27:63:74:8f:
++#          0f:2d:e1:91:a8:4f:da:f2:65:2d:7b:c8:c6:1e:43:93:7a:22:
++#          07:a2:71:1c:b9:d3:63:c5:bc:24:d0:7a:ab:7a:74:b1:d8:40:
++#          e0:2a:21:2d:42:1e:5c:6d:ae:06:11:06:6f:d1:ec:b4:e5:d7:
++#          74:9d:92:85:3d:0d:0a:3d:59:93:51:7d:e7:13:1e:db:48:3b:
++#          3a:d2:96:3d:50:f4:84:21:91:76:56:72:c5:22:ac:96:57:42:
++#          dc:cd:bc:a5:b4:0d:5c:95:d8:a2:a5:49:6f:ae:10:a8:f5:b0:
++#          ad:30:b6:03:5e:14:71:50:be:1c:61:6d:3e:5c:be:7d:a4:ae:
++#          b4:be:b9:3d
++# -----BEGIN CERTIFICATE REQUEST-----
++# MIICrzCCAZcCAQAwFDESMBAGA1UEAxMJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0B
++# AQEFAAOCAQ8AMIIBCgKCAQEA1Xr4V+rZTALD7jyHxPvwA8B+ymyqtFF8hCmliZyC
++# F+0RkMD/PdXDE4gJv2vTWQFCAOuJpYsRLUys+MN7yk8RKmmE1ZjIOE6KnBe756t+
++# lot4S/XbUMPO40txbHcQgZYiJu5y4H1W1gOlYzXdJfhgGCg3RoUcK62Z3+y3s9mc
++# 4sq8ekeJps9LLEVBEqE++n4a2KqSXqcXiT/9i+OfKcRGQqPvO3LreMQwQK8IUSJ5
++# Vz8hXB4/JlYlI2EhJodlIo2a8pxymRlr1oIWFF+6MRQCw2kgXUCj8mqz7xcyOZiy
++# 8mUVHVhYlnU5NqYTcJ2y0N26DqrIM5qzwgC8KE/1pVxIfQIDAQABoFYwEwYJKoZI
++# hvcNAQkUMQYTBFRlc3QwPwYJKoZIhvcNAQkOMTIwMDAMBgNVHRMBAf8EAjAAMCAG
++# A1UdDgEBAAQWBBSLhETiOyHNVDeVLbfo0bHYDpZWEDANBgkqhkiG9w0BAQsFAAOC
++# AQEAlxxfjCc1/XiPdqCgvkNUvmJUUNszWJLYXiixWZuPLQqOf2OmBVJgDHtGkO8B
++# pAmWZlZZ+hXQPusI1tsKt3jCV5cCdWONGdiyzNAMhOTAhoa0YhGcxEiyUWcpAqt6
++# fuASAcG6lrPhkYWYcJBfV3sbI5fB1wstHuS4FcAnY3SPDy3hkahP2vJlLXvIxh5D
++# k3oiB6JxHLnTY8W8JNB6q3p0sdhA4CohLUIeXG2uBhEGb9HstOXXdJ2ShT0NCj1Z
++# k1F95xMe20g7OtKWPVD0hCGRdlZyxSKslldC3M28pbQNXJXYoqVJb64QqPWwrTC2
++# A14UcVC+HGFtPly+faSutL65PQ==
++# -----END CERTIFICATE REQUEST-----
+ 
+ # The exact same PEM data from above
+-pem = '''
++PEM = """
+ -----BEGIN NEW CERTIFICATE REQUEST-----
+ MIICrzCCAZcCAQAwFDESMBAGA1UEAxMJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0B
+ AQEFAAOCAQ8AMIIBCgKCAQEA1Xr4V+rZTALD7jyHxPvwA8B+ymyqtFF8hCmliZyC
+@@ -104,30 +95,32 @@ k3oiB6JxHLnTY8W8JNB6q3p0sdhA4CohLUIeXG2uBhEGb9HstOXXdJ2ShT0NCj1Z
+ k1F95xMe20g7OtKWPVD0hCGRdlZyxSKslldC3M28pbQNXJXYoqVJb64QqPWwrTC2
+ A14UcVC+HGFtPly+faSutL65PQ==
+ -----END NEW CERTIFICATE REQUEST-----
+-'''
+-class TestCertRequest(unittest.TestCase):
++"""
+ 
+-    def setUp(self):
++
++class TestCertRequest:
++    @classmethod
++    def setup_class(cls):
+         nss.nss_init_nodb()
+-        self.csr_der = nss.SecItem(pem, ascii=True)
+-        self.csr = nss.CertificateRequest(self.csr_der)
+ 
+-    def tearDown(self):
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
+ 
+     def test_csr_parse(self):
+-        csr = self.csr
++        csr_der = nss.SecItem(PEM, ascii=True)
++        csr = nss.CertificateRequest(csr_der)
+ 
+         # Validate basic CSR information
+-        self.assertEqual(str(csr.subject), 'CN=localhost')
+-        self.assertEqual(csr.version, 0)
++        assert str(csr.subject) == "CN=localhost"
++        assert csr.version == 0
+ 
+         # Validate the CSR Subject Public Key
+         pub_key = csr.subject_public_key_info
+         pub_key_algorithm = pub_key.algorithm
+ 
+-        self.assertEqual(pub_key_algorithm.id_tag, nss.SEC_OID_PKCS1_RSA_ENCRYPTION)
+-        self.assertEqual(pub_key.public_key.rsa.exponent.get_integer(), 65537)
++        assert pub_key_algorithm.id_tag == nss.SEC_OID_PKCS1_RSA_ENCRYPTION
++        assert pub_key.public_key.rsa.exponent.get_integer() == 65537
+ 
+         # Validate the extensions, the number of extensions should
+         # match, the order of extensions should match, and the
+@@ -136,21 +129,19 @@ class TestCertRequest(unittest.TestCase):
+         # Note, extensions are contained in an attribute, in essence
+         # the extensions are a special case of one attribute.
+         extensions = csr.extensions
+-        self.assertEqual(len(extensions), 2)
++        assert len(extensions) == 2
+ 
+         extension = extensions[0]
+-        self.assertIsInstance(extension, nss.CertificateExtension)
+-        self.assertEqual(extension.oid_tag, nss.SEC_OID_X509_BASIC_CONSTRAINTS)
++        assert isinstance(extension, nss.CertificateExtension)
++        assert extension.oid_tag == nss.SEC_OID_X509_BASIC_CONSTRAINTS
+         bc = nss.BasicConstraints(extension.value)
+-        self.assertEqual(bc.is_ca, False)
+-        self.assertEqual(bc.path_len, 0)
+-
++        assert not bc.is_ca
++        assert bc.path_len == 0
+ 
+         extension = extensions[1]
+-        self.assertIsInstance(extension, nss.CertificateExtension)
+-        self.assertEqual(extension.oid_tag, nss.SEC_OID_X509_SUBJECT_KEY_ID)
+-        self.assertEqual(extension.value.der_to_hex().upper(),
+-                         '8B:84:44:E2:3B:21:CD:54:37:95:2D:B7:E8:D1:B1:D8:0E:96:56:10')
++        assert isinstance(extension, nss.CertificateExtension)
++        assert extension.oid_tag == nss.SEC_OID_X509_SUBJECT_KEY_ID
++        assert extension.value.der_to_hex().upper() == "8B:84:44:E2:3B:21:CD:54:37:95:2D:B7:E8:D1:B1:D8:0E:96:56:10"
+ 
+         # Validate the attributes, the number of attributes should
+         # match and the order of the attributes should match. Each
+@@ -169,33 +160,30 @@ class TestCertRequest(unittest.TestCase):
+         # CertificateExtension's, otherwise they are SecItem's
+         # and need to be interpreted according to the attribute.type.
+         attributes = csr.attributes
+-        self.assertEqual(len(attributes), 2)
++        assert len(attributes) == 2
+ 
+         attribute = attributes[0]
+-        self.assertIsInstance(attribute, nss.CertAttribute)
+-        self.assertEqual(attribute.type_tag, nss.SEC_OID_PKCS9_FRIENDLY_NAME)
++        assert isinstance(attribute, nss.CertAttribute)
++        assert attribute.type_tag == nss.SEC_OID_PKCS9_FRIENDLY_NAME
+ 
+         attribute_values = attribute.values
+-        self.assertEqual(len(attribute_values), 1)
++        assert len(attribute_values) == 1
+ 
+         attribute_value = attribute.values[0]
+-        self.assertIsInstance(attribute_value, nss.SecItem)
+-        self.assertEqual(str(attribute_value), 'Test')
++        assert isinstance(attribute_value, nss.SecItem)
++        assert str(attribute_value) == "Test"
+ 
+         attribute = attributes[1]
+-        self.assertIsInstance(attribute, nss.CertAttribute)
+-        self.assertEqual(attribute.type_tag, nss.SEC_OID_PKCS9_EXTENSION_REQUEST)
++        assert isinstance(attribute, nss.CertAttribute)
++        assert attribute.type_tag == nss.SEC_OID_PKCS9_EXTENSION_REQUEST
+ 
+         attribute_values = attribute.values
+-        self.assertEqual(len(attribute_values), 2)
++        assert len(attribute_values) == 2
+ 
+         attribute_value = attribute.values[0]
+-        self.assertIsInstance(attribute_value, nss.CertificateExtension)
+-        self.assertEqual(attribute_value.oid_tag, nss.SEC_OID_X509_BASIC_CONSTRAINTS)
++        assert isinstance(attribute_value, nss.CertificateExtension)
++        assert attribute_value.oid_tag == nss.SEC_OID_X509_BASIC_CONSTRAINTS
+ 
+         attribute_value = attribute.values[1]
+-        self.assertIsInstance(attribute_value, nss.CertificateExtension)
+-        self.assertEqual(attribute_value.oid_tag, nss.SEC_OID_X509_SUBJECT_KEY_ID)
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        assert isinstance(attribute_value, nss.CertificateExtension)
++        assert attribute_value.oid_tag == nss.SEC_OID_X509_SUBJECT_KEY_ID
+diff --git a/test/test_cipher.py b/test/test_cipher.py
+old mode 100755
+new mode 100644
+index 01a02bd..c4f58fc
+--- a/test/test_cipher.py
++++ b/test/test_cipher.py
+@@ -1,149 +1,101 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import sys
+ import os
+-import unittest
+ 
+ import nss.nss as nss
+ 
+-#-------------------------------------------------------------------------------
++# -------------------------------------------------------------------------------
+ 
+-verbose = False
+-mechanism = nss.CKM_DES_CBC_PAD
+-plain_text = b"Encrypt me!"
+-key = "e8:a7:7c:e2:05:63:6a:31"
+-iv = "e4:bb:3b:d3:c3:71:2e:58"
+-in_filename = sys.argv[0]
+-chunk_size = 128
++MECHANISM = nss.CKM_DES_CBC_PAD
++PLAIN_TEXT = b"Encrypt me!"
++KEY = "e8:a7:7c:e2:05:63:6a:31"
++IV = "e4:bb:3b:d3:c3:71:2e:58"
++CHUNK_SIZE = 128
+ 
+-#-------------------------------------------------------------------------------
++# -------------------------------------------------------------------------------
+ 
+-def setup_contexts(mechanism, key, iv):
++
++def setup_contexts():
+     # Get a PK11 slot based on the cipher
+-    slot = nss.get_best_slot(mechanism)
++    slot = nss.get_best_slot(MECHANISM)
+ 
+-    # If key was supplied use it, otherwise generate one
+-    if key:
+-        if verbose:
+-            print("using supplied key data")
+-            print("key:\n%s" % (key))
+-        key_si = nss.SecItem(nss.read_hex(key))
+-        sym_key = nss.import_sym_key(slot, mechanism, nss.PK11_OriginUnwrap,
+-                                     nss.CKA_ENCRYPT, key_si)
+-    else:
+-        if verbose:
+-            print("generating key data")
+-        sym_key = slot.key_gen(mechanism, None, slot.get_best_key_length(mechanism))
++    key_si = nss.SecItem(nss.read_hex(KEY))
++    sym_key = nss.import_sym_key(slot, MECHANISM, nss.PK11_OriginUnwrap, nss.CKA_ENCRYPT, key_si)
+ 
+-    # If initialization vector was supplied use it, otherwise set it to None
+-    if iv:
+-        if verbose:
+-            print("supplied iv:\n%s" % (iv))
+-        iv_data = nss.read_hex(iv)
+-        iv_si = nss.SecItem(iv_data)
+-        iv_param = nss.param_from_iv(mechanism, iv_si)
+-    else:
+-        iv_length = nss.get_iv_length(mechanism)
+-        if iv_length > 0:
+-            iv_data = nss.generate_random(iv_length)
+-            iv_si = nss.SecItem(iv_data)
+-            iv_param = nss.param_from_iv(mechanism, iv_si)
+-            if verbose:
+-                print("generated %d byte initialization vector: %s" %
+-                      (iv_length, nss.data_to_hex(iv_data, separator=":")))
+-        else:
+-            iv_param = None
++    iv_data = nss.read_hex(IV)
++    iv_si = nss.SecItem(iv_data)
++    iv_param = nss.param_from_iv(MECHANISM, iv_si)
+ 
+     # Create an encoding context
+-    encoding_ctx = nss.create_context_by_sym_key(mechanism, nss.CKA_ENCRYPT,
+-                                                 sym_key, iv_param)
++    encoding_ctx = nss.create_context_by_sym_key(MECHANISM, nss.CKA_ENCRYPT, sym_key, iv_param)
+ 
+     # Create a decoding context
+-    decoding_ctx = nss.create_context_by_sym_key(mechanism, nss.CKA_DECRYPT,
+-                                                 sym_key, iv_param)
++    decoding_ctx = nss.create_context_by_sym_key(MECHANISM, nss.CKA_DECRYPT, sym_key, iv_param)
+ 
+     return encoding_ctx, decoding_ctx
+ 
+-#-------------------------------------------------------------------------------
+ 
+-class TestCipher(unittest.TestCase):
+-    def setUp(self):
++# -------------------------------------------------------------------------------
++
++
++class TestCipher:
++    @classmethod
++    def setup_class(cls):
+         nss.nss_init_nodb()
+-        self.encoding_ctx, self.decoding_ctx = setup_contexts(mechanism, key, iv)
+ 
+-    def tearDown(self):
+-        del self.encoding_ctx
+-        del self.decoding_ctx
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
+ 
+     def test_string(self):
+-        if verbose:
+-            print("Plain Text:\n%s" % (plain_text))
++        (encoding_ctx, decoding_ctx) = setup_contexts()
+ 
+         # Encode the plain text by feeding it to cipher_op getting cipher text back.
+         # Append the final bit of cipher text by calling digest_final
+-        cipher_text = self.encoding_ctx.cipher_op(plain_text)
+-        cipher_text += self.encoding_ctx.digest_final()
+-
+-        if verbose:
+-            print("Cipher Text:\n%s" % (nss.data_to_hex(cipher_text, separator=":")))
++        cipher_text = encoding_ctx.cipher_op(PLAIN_TEXT)
++        cipher_text += encoding_ctx.digest_final()
+ 
+         # Decode the cipher text by feeding it to cipher_op getting plain text back.
+         # Append the final bit of plain text by calling digest_final
+-        decoded_text = self.decoding_ctx.cipher_op(cipher_text)
+-        decoded_text += self.decoding_ctx.digest_final()
+-
+-        if verbose:
+-            print("Decoded Text:\n%s" % (decoded_text))
++        decoded_text = decoding_ctx.cipher_op(cipher_text)
++        decoded_text += decoding_ctx.digest_final()
+ 
+         # Validate the encryption/decryption by comparing the decoded text with
+         # the original plain text, they should match.
+-        self.assertEqual(decoded_text, plain_text)
++        assert decoded_text == PLAIN_TEXT
+ 
+-        self.assertNotEqual(cipher_text, plain_text)
++        assert cipher_text != PLAIN_TEXT
+ 
+-    def test_file(self):
+-        encrypted_filename = os.path.basename(in_filename) + ".encrypted"
+-        decrypted_filename = os.path.basename(in_filename) + ".decrypted"
++    def test_file(self, tmp_path):
++        (encoding_ctx, decoding_ctx) = setup_contexts()
+ 
+-        in_file = open(in_filename, "rb")
+-        encrypted_file = open(encrypted_filename, "wb")
++        encrypted_filename = tmp_path / "encrypted"
++        decrypted_filename = tmp_path / "decrypted"
+ 
+-        if verbose:
+-            print("Encrypting file \"%s\" to \"%s\"" % (in_filename, encrypted_filename))
+-
+-        # Encode the data read from a file in chunks
+-        while True:
+-            # Read a chunk of data until EOF, encrypt it and write the encrypted data
+-            in_data = in_file.read(chunk_size)
+-            if len(in_data) == 0:   # EOF
+-                break
+-            encrypted_data = self.encoding_ctx.cipher_op(in_data)
++        in_filename = os.path.abspath(__file__)
++        with open(in_filename, "rb") as in_file, open(encrypted_filename, "wb") as encrypted_file:
++            # Encode the data read from a file in chunks
++            while True:
++                # Read a chunk of data until EOF, encrypt it and write the encrypted data
++                in_data = in_file.read(CHUNK_SIZE)
++                if len(in_data) == 0:  # EOF
++                    break
++                encrypted_data = encoding_ctx.cipher_op(in_data)
++                encrypted_file.write(encrypted_data)
++            # Done encoding the input, get the final encoded data, write it, close files
++            encrypted_data = encoding_ctx.digest_final()
+             encrypted_file.write(encrypted_data)
+-        # Done encoding the input, get the final encoded data, write it, close files
+-        encrypted_data = self.encoding_ctx.digest_final()
+-        encrypted_file.write(encrypted_data)
+-        in_file.close()
+-        encrypted_file.close()
+ 
+         # Decode the encoded file in a similar fashion
+-        if verbose:
+-            print("Decrypting file \"%s\" to \"%s\"" % (encrypted_filename, decrypted_filename))
+-
+-        encrypted_file = open(encrypted_filename, "rb")
+-        decrypted_file = open(decrypted_filename, "wb")
+-        while True:
+-            # Read a chunk of data until EOF, encrypt it and write the encrypted data
+-            in_data = encrypted_file.read(chunk_size)
+-            if len(in_data) == 0:   # EOF
+-                break
+-            decrypted_data = self.decoding_ctx.cipher_op(in_data)
++        with open(encrypted_filename, "rb") as encrypted_file, open(decrypted_filename, "wb") as decrypted_file:
++            while True:
++                # Read a chunk of data until EOF, encrypt it and write the encrypted data
++                in_data = encrypted_file.read(CHUNK_SIZE)
++                if len(in_data) == 0:  # EOF
++                    break
++                decrypted_data = decoding_ctx.cipher_op(in_data)
++                decrypted_file.write(decrypted_data)
++            # Done encoding the input, get the final encoded data, write it, close files
++            decrypted_data = decoding_ctx.digest_final()
+             decrypted_file.write(decrypted_data)
+-        # Done encoding the input, get the final encoded data, write it, close files
+-        decrypted_data = self.decoding_ctx.digest_final()
+-        decrypted_file.write(decrypted_data)
+-        encrypted_file.close()
+-        decrypted_file.close()
+ 
+         # Validate the encryption/decryption by comparing the decoded text with
+         # the original plain text, they should match.
+@@ -154,21 +106,5 @@ class TestCipher(unittest.TestCase):
+         with open(decrypted_filename, "rb") as f:
+             decrypted_data = f.read()
+ 
+-        if decrypted_data != in_data:
+-            result = 1
+-            print("FAILED! decrypted_data != in_data")
+-
+-        if encrypted_data == in_data:
+-            result = 1
+-            print("FAILED! encrypted_data == in_data")
+-
+-        # clean up
+-        os.unlink(encrypted_filename)
+-        os.unlink(decrypted_filename)
+-
+-
+-
+-#-------------------------------------------------------------------------------
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        assert decrypted_data == in_data
++        assert encrypted_data != in_data
+diff --git a/test/test_client_server.py b/test/test_client_server.py
+old mode 100755
+new mode 100644
+index 33263ec..a8b1c61
+--- a/test/test_client_server.py
++++ b/test/test_client_server.py
+@@ -1,60 +1,46 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
++import logging
+ import os
+-import sys
+-import errno
++import pathlib
+ import signal
++import tempfile
+ import time
+ 
+-import unittest
+-
+ from nss.error import NSPRError
+ import nss.io as io
+ import nss.nss as nss
+ import nss.ssl as ssl
++from setup_certs import CertificateDatabase
+ 
+ # -----------------------------------------------------------------------------
+-NO_CLIENT_CERT             = 0
+-REQUEST_CLIENT_CERT_ONCE   = 1
+-REQUIRE_CLIENT_CERT_ONCE   = 2
+-REQUEST_CLIENT_CERT_ALWAYS = 3
+-REQUIRE_CLIENT_CERT_ALWAYS = 4
+-
+-verbose = True
+-info = True
+-password = 'DB_passwd'
+-use_ssl = True
+-client_cert_action = NO_CLIENT_CERT
+-db_name = 'sql:pki'
+-hostname = os.uname()[1]
+-server_nickname = 'test_server'
+-client_nickname = 'test_user'
+ port = 1234
+ timeout_secs = 10
+-sleep_time = 5
++sleep_time = 10
+ 
++logger = logging.getLogger()
+ 
+ # -----------------------------------------------------------------------------
+ # Callback Functions
+ # -----------------------------------------------------------------------------
+ 
++
+ def password_callback(slot, retry, password):
+-    if password: return password
+-    return getpass.getpass("Enter password: ");
++    if not password:
++        raise RuntimeError("password not set in callback")
++    return password
++
+ 
+ def handshake_callback(sock):
+-    if verbose:
+-        print("-- handshake complete --")
+-        print("peer: %s" % (sock.get_peer_name()))
+-        print("negotiated host: %s" % (sock.get_negotiated_host()))
+-        print()
+-        print(sock.connection_info_str())
+-        print("-- handshake complete --")
+-        print()
++    logger.debug("-- handshake complete --")
++    logger.debug("peer: %s", sock.get_peer_name())
++    logger.debug("negotiated host: %s", sock.get_negotiated_host())
++    logger.debug("")
++    logger.debug("%s", sock.connection_info_str())
++    logger.debug("-- handshake complete --")
++    logger.debug("")
++
+ 
+ def auth_certificate_callback(sock, check_sig, is_server, certdb):
+-    if verbose:
+-        print("auth_certificate_callback: check_sig=%s is_server=%s" % (check_sig, is_server))
++    logger.debug("auth_certificate_callback: check_sig=%s is_server=%s", check_sig, is_server)
+     cert_is_valid = False
+ 
+     cert = sock.get_peer_certificate()
+@@ -62,9 +48,6 @@ def auth_certificate_callback(sock, check_sig, is_server, certdb):
+     if pin_args is None:
+         pin_args = ()
+ 
+-    #if verbose:
+-    #    print("cert:\n%s" % cert)
+-
+     # Define how the cert is being used based upon the is_server flag.  This may
+     # seem backwards, but isn't. If we're a server we're trying to validate a
+     # client cert. If we're a client we're trying to validate a server cert.
+@@ -79,14 +62,12 @@ def auth_certificate_callback(sock, check_sig, is_server, certdb):
+         # and the strerror attribute will contain a string describing the reason.
+         approved_usage = cert.verify_now(certdb, check_sig, intended_usage, *pin_args)
+     except Exception as e:
+-        print("auth_certificate_callback: %s" % e, file=sys.stderr)
++        logger.error("auth_certificate_callback: %s", e)
+         cert_is_valid = False
+-        if verbose:
+-            print("Returning cert_is_valid = %s" % cert_is_valid)
++        logger.debug("Returning cert_is_valid = %s", cert_is_valid)
+         return cert_is_valid
+ 
+-    if verbose:
+-        print("approved_usage = %s" % ', '.join(nss.cert_usage_flags(approved_usage)))
++    logger.debug("approved_usage = %s", ", ".join(nss.cert_usage_flags(approved_usage)))
+ 
+     # Is the intended usage a proper subset of the approved usage
+     if approved_usage & intended_usage:
+@@ -96,8 +77,7 @@ def auth_certificate_callback(sock, check_sig, is_server, certdb):
+ 
+     # If this is a server, we're finished
+     if is_server or not cert_is_valid:
+-        if verbose:
+-            print("Returning cert_is_valid = %s" % cert_is_valid)
++        logger.debug("Returning cert_is_valid = %s", cert_is_valid)
+         return cert_is_valid
+ 
+     # Certificate is OK.  Since this is the client side of an SSL
+@@ -106,274 +86,238 @@ def auth_certificate_callback(sock, check_sig, is_server, certdb):
+     # man-in-the-middle attacks.
+ 
+     hostname = sock.get_hostname()
+-    if verbose:
+-        print("verifying socket hostname (%s) matches cert subject (%s)" % (hostname, cert.subject))
++    logger.debug("verifying socket hostname (%s) matches cert subject (%s)", hostname, cert.subject)
+     try:
+         # If the cert fails validation it will raise an exception
+         cert_is_valid = cert.verify_hostname(hostname)
+     except Exception as e:
+-        print("auth_certificate_callback: %s" % e, file=sys.stderr)
++        logger.error("auth_certificate_callback: %s", e)
+         cert_is_valid = False
+-        if verbose:
+-            print("Returning cert_is_valid = %s" % cert_is_valid)
++        logger.debug("Returning cert_is_valid = %s", cert_is_valid)
+         return cert_is_valid
+ 
+-    if verbose:
+-        print("Returning cert_is_valid = %s" % cert_is_valid)
++    logger.debug("Returning cert_is_valid = %s", cert_is_valid)
+     return cert_is_valid
+ 
++
+ def client_auth_data_callback(ca_names, chosen_nickname, password, certdb):
+     cert = None
+     if chosen_nickname:
+         try:
+             cert = nss.find_cert_from_nickname(chosen_nickname, password)
+             priv_key = nss.find_key_by_any_cert(cert, password)
+-            if verbose:
+-                print("client cert:\n%s" % cert)
++            logger.debug("client cert:\n%s", cert)
+             return cert, priv_key
+         except NSPRError as e:
+-            print("client_auth_data_callback: %s" % e, file=sys.stderr)
++            logger.error("client_auth_data_callback: %s", e)
+             return False
+     else:
+-        nicknames = nss.get_cert_nicknames(certdb, cert.SEC_CERT_NICKNAMES_USER)
++        nicknames = nss.get_cert_nicknames(certdb, nss.SEC_CERT_NICKNAMES_USER)
+         for nickname in nicknames:
+             try:
+                 cert = nss.find_cert_from_nickname(nickname, password)
+-                if verbose:
+-                    print("client cert:\n%s" % cert)
++                logger.debug("client cert:\n%s", cert)
+                 if cert.check_valid_times():
+                     if cert.has_signer_in_ca_names(ca_names):
+                         priv_key = nss.find_key_by_any_cert(cert, password)
+                         return cert, priv_key
+             except NSPRError as e:
+-                print("client_auth_data_callback: %s" % e, file=sys.stderr)
++                logger.error("client_auth_data_callback: %s", e)
+         return False
+ 
++
+ # -----------------------------------------------------------------------------
+ # Client Implementation
+ # -----------------------------------------------------------------------------
+ 
+-def client(request):
+-    if use_ssl:
+-        if info:
+-            print("client: using SSL")
+-        ssl.set_domestic_policy()
++
++def client(request, client_nickname, password):
++    logger.info("client: using SSL")
++    hostname = os.uname()[1]
++    ssl.set_domestic_policy()
+ 
+     # Get the IP Address of our server
+-    try:
+-        addr_info = io.AddrInfo(hostname)
+-    except Exception as e:
+-        print("client: could not resolve host address \"%s\"" % hostname, file=sys.stderr)
+-        return
++    addr_info = io.AddrInfo(hostname)
+ 
+     for net_addr in addr_info:
+         net_addr.port = port
+ 
+-        if use_ssl:
+-            sock = ssl.SSLSocket(net_addr.family)
++        sock = ssl.SSLSocket(net_addr.family)
+ 
+-            # Set client SSL socket options
+-            sock.set_ssl_option(ssl.SSL_SECURITY, True)
+-            sock.set_ssl_option(ssl.SSL_HANDSHAKE_AS_CLIENT, True)
+-            sock.set_hostname(hostname)
++        # Set client SSL socket options
++        sock.set_ssl_option(ssl.SSL_SECURITY, True)
++        sock.set_ssl_option(ssl.SSL_HANDSHAKE_AS_CLIENT, True)
++        sock.set_hostname(hostname)
+ 
+-            # Provide a callback which notifies us when the SSL handshake is complete
+-            sock.set_handshake_callback(handshake_callback)
++        # Provide a callback which notifies us when the SSL handshake is complete
++        sock.set_handshake_callback(handshake_callback)
+ 
+-            # Provide a callback to supply our client certificate info
+-            sock.set_client_auth_data_callback(client_auth_data_callback, client_nickname,
+-                                               password, nss.get_default_certdb())
++        # Provide a callback to supply our client certificate info
++        sock.set_client_auth_data_callback(
++            client_auth_data_callback, client_nickname, password, nss.get_default_certdb()
++        )
+ 
+-            # Provide a callback to verify the servers certificate
+-            sock.set_auth_certificate_callback(auth_certificate_callback,
+-                                               nss.get_default_certdb())
+-        else:
+-            sock = io.Socket(net_addr.family)
++        # Provide a callback to verify the servers certificate
++        sock.set_auth_certificate_callback(auth_certificate_callback, nss.get_default_certdb())
+ 
+         try:
+-            if verbose:
+-                print("client trying connection to: %s" % (net_addr))
++            logger.debug("client trying connection to: %s", net_addr)
+             sock.connect(net_addr, timeout=io.seconds_to_interval(timeout_secs))
+-            if verbose:
+-                print("client connected to: %s" % (net_addr))
++            logger.debug("client connected to: %s", net_addr)
+             break
+         except Exception as e:
+             sock.close()
+-            print("client: connection to: %s failed (%s)" % (net_addr, e), file=sys.stderr)
++            logger.error("client: connection to: %s failed (%s)", net_addr, e)
++    else:
++        raise RuntimeError("All connections failed")
+ 
+     # Talk to the server
+     try:
+-        if info:
+-            print("client: sending \"%s\"" % (request))
+-        data = request + "\n"; # newline is protocol record separator
+-        sock.send(data.encode('utf-8'))
++        logger.info('client: sending "%s"', request)
++        data = request + "\n"  # newline is protocol record separator
++        sock.send(data.encode("utf-8"))
+         buf = sock.readline()
+         if not buf:
+-            print("client: lost connection", file=sys.stderr)
++            logger.error("client: lost connection")
+             sock.close()
+             return
+-        buf = buf.decode('utf-8')
+-        buf = buf.rstrip()        # remove newline record separator
+-        if info:
+-            print("client: received \"%s\"" % (buf))
+-    except Exception as e:
+-        print("client: %s" % e, file=sys.stderr)
++        buf = buf.decode("utf-8")
++        buf = buf.rstrip()  # remove newline record separator
++        logger.info('client: received "%s"', buf)
++    finally:
+         try:
+-            sock.close()
+-        except:
+-            pass
+-        return
++            sock.shutdown()
++        except Exception as e:
++            logger.error("client: %s", e)
+ 
+-    try:
+-        sock.shutdown()
+-    except Exception as e:
+-        print("client: %s" % e, file=sys.stderr)
+-
+-    try:
+         sock.close()
+-        if use_ssl:
+-            ssl.clear_session_cache()
+-    except Exception as e:
+-        print("client: %s" % e, file=sys.stderr)
++        ssl.clear_session_cache()
+ 
+     return buf
+ 
++
+ # -----------------------------------------------------------------------------
+ # Server Implementation
+ # -----------------------------------------------------------------------------
+ 
+-def server():
+-    if verbose:
+-        print("starting server:")
++
++def server(server_nickname, password):
++    logger.debug("starting server:")
+ 
+     # Initialize
+     # Setup an IP Address to listen on any of our interfaces
+     net_addr = io.NetworkAddress(io.PR_IpAddrAny, port)
+ 
+-    if use_ssl:
+-        if info:
+-            print("server: using SSL")
+-        ssl.set_domestic_policy()
+-        nss.set_password_callback(password_callback)
++    logger.info("server: using SSL")
++    ssl.set_domestic_policy()
++    nss.set_password_callback(password_callback)
+ 
+-        # Perform basic SSL server configuration
+-        ssl.set_default_cipher_pref(ssl.SSL_RSA_WITH_NULL_MD5, True)
+-        ssl.config_server_session_id_cache()
++    # Perform basic SSL server configuration
++    ssl.set_default_cipher_pref(ssl.SSL_RSA_WITH_NULL_MD5, True)
++    ssl.config_server_session_id_cache()
+ 
+-        # Get our certificate and private key
+-        server_cert = nss.find_cert_from_nickname(server_nickname, password)
+-        priv_key = nss.find_key_by_any_cert(server_cert, password)
+-        server_cert_kea = server_cert.find_kea_type();
++    # Get our certificate and private key
++    server_cert = nss.find_cert_from_nickname(server_nickname, password)
++    priv_key = nss.find_key_by_any_cert(server_cert, password)
++    server_cert_kea = server_cert.find_kea_type()
+ 
+-        #if verbose:
+-        #    print("server cert:\n%s" % server_cert)
++    sock = ssl.SSLSocket(net_addr.family)
+ 
+-        sock = ssl.SSLSocket(net_addr.family)
++    # Set server SSL socket options
++    sock.set_pkcs11_pin_arg(password)
++    sock.set_ssl_option(ssl.SSL_SECURITY, True)
++    sock.set_ssl_option(ssl.SSL_HANDSHAKE_AS_SERVER, True)
+ 
+-        # Set server SSL socket options
+-        sock.set_pkcs11_pin_arg(password)
+-        sock.set_ssl_option(ssl.SSL_SECURITY, True)
+-        sock.set_ssl_option(ssl.SSL_HANDSHAKE_AS_SERVER, True)
++    sock.set_auth_certificate_callback(auth_certificate_callback, nss.get_default_certdb())
+ 
+-        # If we're doing client authentication then set it up
+-        if client_cert_action >= REQUEST_CLIENT_CERT_ONCE:
+-            sock.set_ssl_option(ssl.SSL_REQUEST_CERTIFICATE, True)
+-        if client_cert_action == REQUIRE_CLIENT_CERT_ONCE:
+-            sock.set_ssl_option(ssl.SSL_REQUIRE_CERTIFICATE, True)
+-        sock.set_auth_certificate_callback(auth_certificate_callback, nss.get_default_certdb())
+-
+-        # Configure the server SSL socket
+-        sock.config_secure_server(server_cert, priv_key, server_cert_kea)
+-
+-    else:
+-        sock = io.Socket(net_addr.family)
++    # Configure the server SSL socket
++    sock.config_secure_server(server_cert, priv_key, server_cert_kea)
+ 
+     # Bind to our network address and listen for clients
+     sock.bind(net_addr)
+-    if verbose:
+-        print("listening on: %s" % (net_addr))
++    logger.debug("listening on: %s", net_addr)
+     sock.listen()
+ 
+     while True:
+         # Accept a connection from a client
+         client_sock, client_addr = sock.accept()
+-        if use_ssl:
+-            client_sock.set_handshake_callback(handshake_callback)
++        client_sock.set_handshake_callback(handshake_callback)
+ 
+-        if verbose:
+-            print("client connect from: %s" % (client_addr))
++        logger.debug("client connect from: %s", client_addr)
+ 
+         while True:
+             try:
+                 # Handle the client connection
+-                buf = client_sock.readline()   # newline is protocol record separator
++                buf = client_sock.readline()  # newline is protocol record separator
+                 if not buf:
+-                    print("server: lost lost connection to %s" % (client_addr), file=sys.stderr)
++                    logger.error("server: lost lost connection to %s", client_addr)
+                     break
+-                buf = buf.decode('utf-8')
+-                buf = buf.rstrip()             # remove newline record separator
++                buf = buf.decode("utf-8")
++                buf = buf.rstrip()  # remove newline record separator
+ 
+-                if info:
+-                    print("server: received \"%s\"" % (buf))
+-                reply = "{%s}" % buf           # echo embedded inside braces
+-                if info:
+-                    print("server: sending \"%s\"" % (reply))
+-                data = reply + "\n" # send echo with record separator
+-                client_sock.send(data.encode('utf-8'))
++                logger.info('server: received "%s"', buf)
++                reply = "{%s}" % buf  # echo embedded inside braces
++                logger.info('server: sending "%s"', reply)
++                data = reply + "\n"  # send echo with record separator
++                client_sock.send(data.encode("utf-8"))
+ 
+                 time.sleep(sleep_time)
+                 client_sock.shutdown()
+                 client_sock.close()
+                 break
+             except Exception as e:
+-                print("server: %s" % e, file=sys.stderr)
++                logger.error("server: %s", e)
+                 break
+         break
+ 
+     # Clean up
+     sock.shutdown()
+     sock.close()
+-    if use_ssl:
+-        ssl.shutdown_server_session_id_cache()
++    ssl.shutdown_server_session_id_cache()
++
+ 
+ # -----------------------------------------------------------------------------
+ 
+-def run_server():
++
++def run_server(certdb):
+     pid = os.fork()
+     if pid == 0:
+-        nss.nss_init(db_name)
+-        server()
++        nss.nss_init(certdb.db_name)
++        server(certdb.server_nickname, certdb.db_passwd)
+         nss.nss_shutdown()
++        os._exit(0)
+     time.sleep(sleep_time)
+     return pid
+ 
++
+ def cleanup_server(pid):
+-    try:
+-        wait_pid, wait_status = os.waitpid(pid, os.WNOHANG)
+-        if wait_pid == 0:
+-            os.kill(pid, signal.SIGKILL)
+-    except OSError as e:
+-        if e.errno == errno.ECHILD:
+-            pass                # child already exited
+-        else:
+-            print("cleanup_server: %s" % e, file=sys.stderr)
++    wait_pid, _ = os.waitpid(pid, os.WNOHANG)
++    if wait_pid == 0:
++        os.kill(pid, signal.SIGKILL)
+ 
+-class TestSSL(unittest.TestCase):
+ 
+-    def setUp(self):
+-        print()
+-        self.server_pid = run_server()
++class TestSSL:
++    # Do not call nss_init here, set it up separately in client and server
++    @classmethod
++    def setup_class(cls):
++        cls.basedir = tempfile.TemporaryDirectory()
++        cls.certdb = CertificateDatabase(pathlib.Path(cls.basedir.name))
++        cls.pid = run_server(cls.certdb)
+ 
+-    def tearDown(self):
+-        cleanup_server(self.server_pid)
++    @classmethod
++    def teardown_class(cls):
++        del cls.certdb
++        cls.basedir.cleanup()
++        del cls.basedir
++        cleanup_server(cls.pid)
++        del cls.pid
+ 
+     def test_ssl(self):
++        nss.nss_init(self.certdb.db_name)
++        nss.set_password_callback(password_callback)
++
+         request = "foo"
+-        nss.nss_init(db_name)
+-        reply = client(request)
++        nss.nss_init(self.certdb.db_name)
++        reply = client(request, self.certdb.client_nickname, self.certdb.db_passwd)
+         nss.nss_shutdown()
+-        self.assertEqual("{%s}" % request, reply)
+-
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        assert ("{%s}" % request) == reply
+diff --git a/test/test_digest.py b/test/test_digest.py
+old mode 100755
+new mode 100644
+index 86fb30b..6810636
+--- a/test/test_digest.py
++++ b/test/test_digest.py
+@@ -1,121 +1,30 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import subprocess
+-import sys
+-import unittest
++import hashlib
++import os
+ 
++from conftest import digest_test
+ import nss.nss as nss
+ 
+-#-------------------------------------------------------------------------------
+ 
+-verbose = False
+-in_filename = sys.argv[0]
+-chunk_size = 128
++class TestDigest:
+ 
++    reference_file = os.path.abspath(__file__)
+ 
+-#-------------------------------------------------------------------------------
+-
+-class TestDigest(unittest.TestCase):
+-    def setUp(self):
++    @classmethod
++    def setup_class(cls):
+         nss.nss_init_nodb()
+ 
+-    def tearDown(self):
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
+ 
+-    def do_test(self, name, ref_cmd, nss_digest_func, hash_oid):
+-        hash_oid_name = nss.oid_str(hash_oid)
+-
+-        if verbose:
+-            print('running test %s: nss_digest_func=%s hash_oid=%s in_filename=%s' % \
+-                (name, nss_digest_func.__name__, hash_oid_name, in_filename))
+-
+-        # read binary data in from the file
+-        with open(in_filename, "rb") as f:
+-            ref_data = f.read()
+-
+-        # Run the system hash function to get a reference result.
+-        # Since we're testing the python-nss binding we assume
+-        # the system command is entirely independent and correct.
+-        #
+-        # Because our digest routines return binary data (e.g. a buffer
+-        # of octets) and the system hash command returns a hex string
+-        # which we need to compare against, and because we sometimes
+-        # want to print the result of our digest functions always
+-        # convert our results to a hex string via nss.data_to_hex()
+-        #
+-        # We want to read the reference result from the subprocess as text
+-        # not binary, thus universal_newlines must be True.
+-        proc = subprocess.Popen([ref_cmd, in_filename], stdout=subprocess.PIPE,
+-                                universal_newlines=True)
+-        stdout, stderr = proc.communicate()
+-        reference_digest = stdout.split()[0]
+-        if verbose:
+-            print('reference_digest\n%s' % (reference_digest))
+-
+-        # Run the test with convenience digest function (e.g. nss.sha256_digest, etc.).
+-        test_digest =  nss.data_to_hex(nss_digest_func(ref_data), separator=None)
+-        if verbose:
+-            print('nss %s\n%s' % (nss_digest_func.__name__, test_digest))
+-
+-        self.assertEqual(test_digest, reference_digest,
+-                         msg='nss %s test failed reference=%s test=%s' % \
+-                             (nss_digest_func.__name__, reference_digest, test_digest))
+-
+-        # Run the test using the generic hash_buf function specifying the hash algorithm.
+-        test_digest =  nss.data_to_hex(nss.hash_buf(hash_oid, ref_data), separator=None)
+-        if verbose:
+-            print('nss.hash_buf %s\n%s' % (hash_oid_name, test_digest))
+-
+-        self.assertEqual(test_digest, reference_digest,
+-                         msg='nss.hash_buf %s test failed reference=%s test=%s' % \
+-                             (hash_oid_name, reference_digest, test_digest))
+-
+-        # Run the test using the lowest level hashing functions by specifying the hash algorithm.
+-        # The entire input data is supplied all at once in a single call.
+-        context = nss.create_digest_context(hash_oid)
+-        context.digest_begin()
+-        context.digest_op(ref_data)
+-        test_digest = nss.data_to_hex(context.digest_final(), separator=None)
+-        if verbose:
+-            print('nss.digest_context %s\n%s' % (hash_oid_name, test_digest))
+-
+-        self.assertEqual(test_digest, reference_digest,
+-                         msg='nss.digest_context %s test failed reference=%s test=%s' % \
+-                             (hash_oid_name, reference_digest, test_digest))
+-
+-        # Run the test using the lowest level hashing functions by specifying the hash algorithm
+-        # and feeding 'chunks' of data one at a time to be consumed.
+-        with open(in_filename, 'rb') as in_file:
+-            context = nss.create_digest_context(hash_oid)
+-            context.digest_begin()
+-            while True:
+-                in_data = in_file.read(chunk_size)
+-                if len(in_data) == 0:
+-                    break
+-                context.digest_op(in_data)
+-
+-        test_digest = nss.data_to_hex(context.digest_final(), separator=None)
+-        if verbose:
+-            print('chunked nss.digest_context %s\n%s' % (hash_oid_name, test_digest))
+-
+-        self.assertEqual(test_digest, reference_digest,
+-                         msg='chunked nss.digest_context %s test failed reference=%s test=%s' % \
+-                             (hash_oid_name, reference_digest, test_digest))
+-
+     def test_md5(self):
+-        self.do_test('md5', 'md5sum', nss.md5_digest, nss.SEC_OID_MD5)
++        digest_test("md5", self.reference_file, hashlib.md5(), nss.md5_digest, nss.SEC_OID_MD5)
+ 
+     def test_sha1(self):
+-        self.do_test('sha1', 'sha1sum', nss.sha1_digest, nss.SEC_OID_SHA1)
++        digest_test("sha1", self.reference_file, hashlib.sha1(), nss.sha1_digest, nss.SEC_OID_SHA1)
+ 
+     def test_sha256(self):
+-        self.do_test('sha256', 'sha256sum', nss.sha256_digest, nss.SEC_OID_SHA256)
++        digest_test("sha256", self.reference_file, hashlib.sha256(), nss.sha256_digest, nss.SEC_OID_SHA256)
+ 
+     def test_sha512(self):
+-        self.do_test('sha512', 'sha512sum', nss.sha512_digest, nss.SEC_OID_SHA512)
+-
+-
+-#-------------------------------------------------------------------------------
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        digest_test("sha512", self.reference_file, hashlib.sha512(), nss.sha512_digest, nss.SEC_OID_SHA512)
+diff --git a/test/test_misc.py b/test/test_misc.py
+old mode 100755
+new mode 100644
+index f316436..84ac602
+--- a/test/test_misc.py
++++ b/test/test_misc.py
+@@ -1,58 +1,54 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import sys
+-import os
+-import unittest
+-
+ import nss.nss as nss
+-import six
+ 
+-#-------------------------------------------------------------------------------
+-class TestVersion(unittest.TestCase):
++# -------------------------------------------------------------------------------
++class TestVersion:
++    @classmethod
++    def setup_class(cls):
++        nss.nss_init_nodb()
++
++    @classmethod
++    def teardown_class(cls):
++        nss.nss_shutdown()
++
+     def test_version(self):
+-
+         version = nss.nss_get_version()
+-        self.assertEqual(nss.nss_version_check(version), True)
++        assert nss.nss_version_check(version)
+ 
+-class TestShutdownCallback(unittest.TestCase):
++
++class TestShutdownCallback:
+     def test_shutdown_callback(self):
+         int_value = 43
+-        str_value = u"foobar"
++        str_value = "foobar"
+         count = 0
+-        dict_value = {'count': count}
++        dict_value = {"count": count}
+ 
+         def shutdown_callback(nss_data, i, s, d):
+-            self.assertEqual(isinstance(nss_data, dict), True)
++            assert isinstance(nss_data, dict)
+ 
+-            self.assertEqual(isinstance(i, int), True)
+-            self.assertEqual(i, int_value)
++            assert isinstance(i, int)
++            assert i == int_value
+ 
+-            self.assertEqual(isinstance(s, six.string_types), True)
+-            self.assertEqual(s, str_value)
++            assert isinstance(s, str)
++            assert s == str_value
+ 
+-            self.assertEqual(isinstance(d, dict), True)
+-            self.assertEqual(d, dict_value)
+-            d['count'] += 1
++            assert isinstance(d, dict)
++            assert d == dict_value
++            d["count"] += 1
+             return True
+ 
+         nss.nss_init_nodb()
+         nss.set_shutdown_callback(shutdown_callback, int_value, str_value, dict_value)
+         nss.nss_shutdown()
+-        self.assertEqual(dict_value['count'], count + 1)
++        assert dict_value["count"] == count + 1
+ 
+         # Callback should not be invoked again after shutdown
+         nss.nss_init_nodb()
+         nss.nss_shutdown()
+-        self.assertEqual(dict_value['count'], count + 1)
++        assert dict_value["count"] == count + 1
+ 
+         # Callback should not be invoked if cleared
+         nss.nss_init_nodb()
+         nss.set_shutdown_callback(shutdown_callback, int_value, str_value, dict_value)
+         nss.set_shutdown_callback(None)
+         nss.nss_shutdown()
+-        self.assertEqual(dict_value['count'], count + 1)
+-
+-#-------------------------------------------------------------------------------
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        assert dict_value["count"] == count + 1
+diff --git a/test/test_ocsp.py b/test/test_ocsp.py
+index 8eb3abd..0c75565 100644
+--- a/test/test_ocsp.py
++++ b/test/test_ocsp.py
+@@ -1,47 +1,57 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import sys
+-import os
+-import unittest
++import pathlib
++import tempfile
++
++import pytest
+ 
+-import nss.nss as nss
+ from nss.error import NSPRError
++import nss.nss as nss
++from setup_certs import CertificateDatabase
+ 
+-db_name = 'sql:pki'
+-
+-#-------------------------------------------------------------------------------
++# -------------------------------------------------------------------------------
+ 
+ # At the moment the OCSP tests are weak, we just test we can
+ # successfully call each of the functions.
+ 
+-class TestAPI(unittest.TestCase):
+-    def setUp(self):
+-        nss.nss_init_read_write(db_name)
+-        self.certdb = nss.get_default_certdb()
+ 
+-    def tearDown(self):
++class TestAPI:
++    @classmethod
++    def setup_class(cls):
++        cls.basedir = tempfile.TemporaryDirectory()
++        certdb = CertificateDatabase(pathlib.Path(cls.basedir.name))
++        cls.ca_nickname = certdb.ca_nickname
++        nss.nss_init_read_write(certdb.db_name)
++
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
++        cls.basedir.cleanup()
++        del cls.basedir
++        del cls.ca_nickname
++
++    @property
++    def certdb(self):
++        return nss.get_default_certdb()
+ 
+     def test_ocsp_cache(self):
+         nss.set_ocsp_cache_settings(100, 10, 20)
+         nss.clear_ocsp_cache()
+ 
+     def test_ocsp_timeout(self):
+-        with self.assertRaises(TypeError):
+-            nss.set_ocsp_timeout('ten')
++        with pytest.raises(TypeError):
++            nss.set_ocsp_timeout("ten")
+         nss.set_ocsp_timeout(10)
+ 
+     def test_ocsp_failure_mode(self):
+         nss.set_ocsp_failure_mode(nss.ocspMode_FailureIsVerificationFailure)
+         nss.set_ocsp_failure_mode(nss.ocspMode_FailureIsNotAVerificationFailure)
+-        with self.assertRaises(NSPRError):
++        with pytest.raises(NSPRError):
+             nss.set_ocsp_failure_mode(-1)
+ 
+     def test_ocsp_default_responder(self):
+         # should raise error if cert is not known
+-        with self.assertRaises(NSPRError):
+-            nss.set_ocsp_default_responder(self.certdb, "http://foo.com:80/ocsp", 'invalid')
+-        nss.set_ocsp_default_responder(self.certdb, "http://foo.com:80/ocsp", 'test_ca')
++        with pytest.raises(NSPRError):
++            nss.set_ocsp_default_responder(self.certdb, "http://foo.com:80/ocsp", "invalid")
++        nss.set_ocsp_default_responder(self.certdb, "http://foo.com:80/ocsp", self.ca_nickname)
+         nss.enable_ocsp_default_responder()
+         nss.disable_ocsp_default_responder()
+         nss.enable_ocsp_default_responder(self.certdb)
+@@ -55,21 +65,15 @@ class TestAPI(unittest.TestCase):
+ 
+     def test_use_pkix_for_validation(self):
+         # Must be boolean
+-        with self.assertRaises(TypeError):
+-            nss.set_use_pkix_for_validation('true')
++        with pytest.raises(TypeError):
++            nss.set_use_pkix_for_validation("true")
+ 
+         value = nss.get_use_pkix_for_validation()
+-        self.assertEqual(isinstance(value, bool), True)
++        assert isinstance(value, bool)
+ 
+         prev = nss.set_use_pkix_for_validation(not value)
+-        self.assertEqual(isinstance(prev, bool), True)
+-        self.assertEqual(value, prev)
+-        self.assertEqual(nss.get_use_pkix_for_validation(), not value)
++        assert isinstance(prev, bool)
++        assert value == prev
++        assert nss.get_use_pkix_for_validation() == (not value)
+ 
+-        self.assertEqual(nss.set_use_pkix_for_validation(value), not value)
+-
+-
+-#-------------------------------------------------------------------------------
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        assert nss.set_use_pkix_for_validation(value) == (not value)
+diff --git a/test/test_pkcs12.py b/test/test_pkcs12.py
+old mode 100755
+new mode 100644
+index aec60eb..3392c16
+--- a/test/test_pkcs12.py
++++ b/test/test_pkcs12.py
+@@ -1,261 +1,240 @@
+-from __future__ import print_function
+-from __future__ import absolute_import
+-import sys
+-import os
++from io import BytesIO
++import logging
++import pathlib
+ import re
+ import subprocess
+-import shlex
+-from io import BytesIO
+-import unittest
++import tempfile
++
++import pytest
+ 
+-from nss.error import NSPRError
+-import nss.error as nss_error
+ import nss.nss as nss
++from setup_certs import CertificateDatabase
++from util import resolve_path
+ 
+-#-------------------------------------------------------------------------------
++# -------------------------------------------------------------------------------
+ 
+-verbose = False
+-db_name = 'sql:pki'
+-db_passwd = 'DB_passwd'
+-pk12_passwd = 'PK12_passwd'
++logger = logging.getLogger()
++pk12_passwd = "PK12_passwd"
+ 
+-cert_nickname = 'test_user'
+-pk12_filename = '%s.p12' % cert_nickname
+-exported_pk12_filename = 'exported_%s' % pk12_filename
+ 
+-#-------------------------------------------------------------------------------
+-
+-class CmdError(Exception):
+-    def __init__(self, cmd_args, returncode, message=None, stdout=None, stderr=None):
+-        self.cmd_args = cmd_args
+-        self.returncode = returncode
+-        if message is None:
+-            self.message = 'Failed error=%s, ' % (returncode)
+-            if stderr:
+-                self.message += '"%s", ' % stderr
+-            self.message += 'args=%s' % (cmd_args)
+-        else:
+-            self.message = message
+-        self.stdout = stdout
+-        self.stderr = stderr
+-
+-    def __str__(self):
+-        return self.message
+-
+-
+-def run_cmd(cmd_args, input=None):
+-    try:
+-        p = subprocess.Popen(cmd_args,
+-                             stdin=subprocess.PIPE,
+-                             stdout=subprocess.PIPE,
+-                             stderr=subprocess.PIPE,
+-                             universal_newlines=True)
+-        stdout, stderr = p.communicate(input)
+-        returncode = p.returncode
+-        if returncode != 0:
+-            raise CmdError(cmd_args, returncode,
+-                           'failed %s' % (', '.join(cmd_args)),
+-                           stdout, stderr)
+-        return stdout, stderr
+-    except OSError as e:
+-        raise CmdError(cmd_args, e.errno, stderr=str(e))
+-
+-#-------------------------------------------------------------------------------
+-
+-def password_callback(slot, retry):
+-    return db_passwd
+-
+-
+-def nickname_collision_callback(old_nickname, cert):
+-    cancel = False
+-    new_nickname = cert.make_ca_nickname()
+-    return new_nickname, cancel
+-
+-
+-def get_cert_der_from_db(nickname):
+-    cmd_args = ['/usr/bin/certutil',
+-                '-d', db_name,
+-                '-L',
+-                '-n', nickname]
++def get_cert_der_from_db(db_name, nickname):
++    cmd_args = [resolve_path("certutil"), "-d", db_name, "-L", "-n", nickname]
+ 
+     try:
+-        stdout, stderr = run_cmd(cmd_args)
+-    except CmdError as e:
+-        if e.returncode == 255 and 'not found' in e.stderr:
++        process_result = subprocess.run(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
++    except subprocess.CalledProcessError as e:
++        stderr = e.stderr.decode("utf-8")
++        if e.returncode == 255 and "not found" in stderr:
+             return None
+         else:
+             raise
+-    return stdout
++    return process_result.stdout
+ 
+-def delete_cert_from_db(nickname):
+-    cmd_args = ['/usr/bin/certutil',
+-                '-d', db_name,
+-                '-D',
+-                '-n', nickname]
+ 
+-    run_cmd(cmd_args)
++def delete_cert_from_db(db_name, nickname):
++    cmd_args = [resolve_path("certutil"), "-d", db_name, "-D", "-n", nickname]
++
++    subprocess.check_call(cmd_args)
++
++
++def pk12_tempfile(certdb):
++    pk12_file = tempfile.NamedTemporaryFile()
++    cmd_args = [
++        resolve_path("pk12util"),
++        "-o",
++        pk12_file.name,
++        "-n",
++        certdb.client_nickname,
++        "-d",
++        certdb.db_name,
++        "-K",
++        certdb.db_passwd,
++        "-W",
++        pk12_passwd,
++    ]
++    subprocess.check_call(cmd_args)
++
++    return pk12_file
+ 
+-def create_pk12(nickname, filename):
+-    cmd_args = ['/usr/bin/pk12util',
+-                '-o', filename,
+-                '-n', nickname,
+-                '-d', db_name,
+-                '-K', db_passwd,
+-                '-W', pk12_passwd]
+-    run_cmd(cmd_args)
+ 
+ def list_pk12(filename):
+-    cmd_args = ['/usr/bin/pk12util',
+-                '-l', filename,
+-                '-W', pk12_passwd]
+-    stdout, stderr = run_cmd(cmd_args)
+-    return stdout
++    cmd_args = [resolve_path("pk12util"), "-l", filename, "-W", pk12_passwd]
++    return subprocess.check_output(cmd_args)
+ 
+-def strip_key_from_pk12_listing(text):
+-    match = re.search(r'^Certificate:$', text, re.MULTILINE)
++
++def strip_key_from_pk12_listing(text: str) -> str:
++    match = re.search(r"^Certificate:$", text, re.MULTILINE)
+     if not match:
+-        raise ValueError('Could not file Key section in pk12 listing')
+-    return text[match.start(0):]
+-
+-def strip_salt_from_pk12_listing(text):
+-    return re.sub(r'\s+Salt:\s*\n.*', '', text)
+-
+-#-------------------------------------------------------------------------------
+-
+-def load_tests(loader, tests, pattern):
+-    suite = unittest.TestSuite()
+-    tests = loader.loadTestsFromNames(['test_pkcs12.TestPKCS12Decoder.test_read',
+-                                       'test_pkcs12.TestPKCS12Decoder.test_import_filename',
+-                                       'test_pkcs12.TestPKCS12Decoder.test_import_fileobj',
+-                                       'test_pkcs12.TestPKCS12Decoder.test_import_filelike',
+-                                       'test_pkcs12.TestPKCS12Export.test_export',
+-                                       ])
+-    suite.addTests(tests)
+-    return suite
+-
+-#-------------------------------------------------------------------------------
+-
+-class TestPKCS12Decoder(unittest.TestCase):
+-    def setUp(self):
+-        nss.nss_init_read_write(db_name)
+-        nss.set_password_callback(password_callback)
+-        nss.pkcs12_set_nickname_collision_callback(nickname_collision_callback)
+-        nss.pkcs12_enable_all_ciphers()
+-        self.cert_der = get_cert_der_from_db(cert_nickname)
+-        if self.cert_der is None:
+-            raise ValueError('cert with nickname "%s" not in database "%s"' % (cert_nickname, db_name))
+-
+-    def tearDown(self):
++        raise ValueError("Could not file Key section in pk12 listing")
++    return text[match.start(0) :]
++
++
++def strip_salt_from_pk12_listing(text: str) -> str:
++    return re.sub(r"\s+Salt:\s*\n.*", "", text)
++
++
++def setup_password_callback(password):
++    def password_callback(slot, retry):
++        return password
++
++    nss.set_password_callback(password_callback)
++
++
++def cert_der(certdb):
++    der = get_cert_der_from_db(certdb.db_name, certdb.client_nickname)
++
++    if der is None:
++        raise ValueError('cert with nickname "%s" not in database "%s"' % (certdb.client_nickname, certdb.db_name))
++
++    return der
++
++
++class TestPKCS12Decoder:
++    @classmethod
++    def setup_class(cls):
++        cls.basedir = tempfile.TemporaryDirectory()
++        cls.certdb = CertificateDatabase(pathlib.Path(cls.basedir.name))
++        nss.nss_init(cls.certdb.db_name)
++        setup_password_callback(cls.certdb.db_passwd)
++
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
++        cls.basedir.cleanup()
++        del cls.basedir
+ 
+     def test_read(self):
+-        if verbose:
+-            print("test_read")
+-        create_pk12(cert_nickname, pk12_filename)
++        logger.debug("test_read")
++        pk12 = pk12_tempfile(self.certdb)
++        pk12_filename = pk12.name
+ 
+         slot = nss.get_internal_key_slot()
+         pkcs12 = nss.PKCS12Decoder(pk12_filename, pk12_passwd, slot)
+ 
+-        self.assertEqual(len(pkcs12), 3)
++        assert len(pkcs12) == 3
+         cert_bag_count = 0
+         key_seen = None
+         for bag in pkcs12:
+             if bag.type == nss.SEC_OID_PKCS12_V1_CERT_BAG_ID:
+-                self.assertIsNone(bag.shroud_algorithm_id)
++                assert bag.shroud_algorithm_id is None
+                 cert_bag_count += 1
+                 if key_seen is None:
+                     key_seen = bag.has_key
+                 elif key_seen is True:
+-                    self.assertIs(bag.has_key, False)
++                    assert not bag.has_key
+                 elif key_seen is False:
+-                    self.assertIs(bag.has_key, True)
++                    assert bag.has_key
+                 else:
+-                    self.fail("unexpected has_key for bag type = %s(%d)" % (bag.has_key, nss.oid_tag_name(bag.type), bag.type))
++                    pytest.fail("unexpected has_key for bag type = %s(%d)" % (nss.oid_tag_name(bag.type), bag.type))
+ 
+             elif bag.type == nss.SEC_OID_PKCS12_V1_PKCS8_SHROUDED_KEY_BAG_ID:
+-                self.assertIsInstance(bag.shroud_algorithm_id, nss.AlgorithmID)
+-                self.assertIs(bag.has_key, False)
++                assert isinstance(bag.shroud_algorithm_id, nss.AlgorithmID)
++                assert not bag.has_key
+             else:
+-                self.fail("unexpected bag type = %s(%d)" % (nss.oid_tag_name(bag.type), bag.type))
++                pytest.fail("unexpected bag type = %s(%d)" % (nss.oid_tag_name(bag.type), bag.type))
+ 
+-        self.assertEqual(cert_bag_count, 2)
++        assert cert_bag_count == 2
++
++
++class TestDestructive:
++    # Destructive tests each get their own database
++    def setup_method(self, method):
++        self.basedir = tempfile.TemporaryDirectory()
++        self.certdb = CertificateDatabase(pathlib.Path(self.basedir.name))
++        nss.nss_init_read_write(self.certdb.db_name)
++        setup_password_callback(self.certdb.db_passwd)
++
++        self.pk12 = pk12_tempfile(self.certdb)
++        self.pk12_filename = self.pk12.name
++
++    def teardown_method(self, method):
++        nss.nss_shutdown()
++        del self.certdb
++
++        self.basedir.cleanup()
++        del self.basedir
++
++        del self.pk12_filename
++        del self.pk12
+ 
+     def test_import_filename(self):
+-        if verbose:
+-            print("test_import_filename")
+-        delete_cert_from_db(cert_nickname)
+-        self.assertEqual(get_cert_der_from_db(cert_nickname), None)
++        logger.debug("test_import_filename")
++
++        delete_cert_from_db(self.certdb.db_name, self.certdb.client_nickname)
++        assert get_cert_der_from_db(self.certdb.db_name, self.certdb.client_nickname) is None
+ 
+         slot = nss.get_internal_key_slot()
+-        pkcs12 = nss.PKCS12Decoder(pk12_filename, pk12_passwd, slot)
++        pkcs12 = nss.PKCS12Decoder(self.pk12_filename, pk12_passwd, slot)
+         slot.authenticate()
+         pkcs12.database_import()
+-        cert_der = get_cert_der_from_db(cert_nickname)
+-        self.assertEqual(cert_der, self.cert_der)
++        db_cert_der = get_cert_der_from_db(self.certdb.db_name, self.certdb.client_nickname)
++        assert db_cert_der == cert_der(self.certdb)
+ 
+     def test_import_fileobj(self):
+-        if verbose:
+-            print("test_import_fileobj")
+-        delete_cert_from_db(cert_nickname)
+-        self.assertEqual(get_cert_der_from_db(cert_nickname), None)
++        logger.debug("test_import_fileobj")
++        delete_cert_from_db(self.certdb.db_name, self.certdb.client_nickname)
++        assert get_cert_der_from_db(self.certdb.db_name, self.certdb.client_nickname) is None
+ 
+         slot = nss.get_internal_key_slot()
+ 
+-        with open(pk12_filename, "rb") as file_obj:
+-             pkcs12 = nss.PKCS12Decoder(file_obj, pk12_passwd, slot)
++        with open(self.pk12_filename, "rb") as file_obj:
++            pkcs12 = nss.PKCS12Decoder(file_obj, pk12_passwd, slot)
+         slot.authenticate()
+         pkcs12.database_import()
+-        cert_der = get_cert_der_from_db(cert_nickname)
+-        self.assertEqual(cert_der, self.cert_der)
++        db_cert_der = get_cert_der_from_db(self.certdb.db_name, self.certdb.client_nickname)
++        assert db_cert_der == cert_der(self.certdb)
+ 
+     def test_import_filelike(self):
+-        if verbose:
+-            print("test_import_filelike")
+-        delete_cert_from_db(cert_nickname)
+-        self.assertEqual(get_cert_der_from_db(cert_nickname), None)
++        logger.debug("test_import_filelike")
++        delete_cert_from_db(self.certdb.db_name, self.certdb.client_nickname)
++        assert get_cert_der_from_db(self.certdb.db_name, self.certdb.client_nickname) is None
+ 
+         slot = nss.get_internal_key_slot()
+ 
+-        with open(pk12_filename, "rb") as f:
++        with open(self.pk12_filename, "rb") as f:
+             data = f.read()
+         file_obj = BytesIO(data)
+ 
+         pkcs12 = nss.PKCS12Decoder(file_obj, pk12_passwd, slot)
+         slot.authenticate()
+         pkcs12.database_import()
+-        cert_der = get_cert_der_from_db(cert_nickname)
+-        self.assertEqual(cert_der, self.cert_der)
++        db_cert_der = get_cert_der_from_db(self.certdb.db_name, self.certdb.client_nickname)
++        assert db_cert_der == cert_der(self.certdb)
+ 
+-#-------------------------------------------------------------------------------
+ 
+-class TestPKCS12Export(unittest.TestCase):
+-    def setUp(self):
+-        nss.nss_init(db_name)
+-        nss.set_password_callback(password_callback)
++class TestPKCS12Export:
++    @classmethod
++    def setup_class(cls):
++        cls.basedir = tempfile.TemporaryDirectory()
++        cls.certdb = CertificateDatabase(pathlib.Path(cls.basedir.name))
++        nss.nss_init(cls.certdb.db_name)
++        setup_password_callback(cls.certdb.db_passwd)
+         nss.pkcs12_enable_all_ciphers()
+-        self.cert_der = get_cert_der_from_db(cert_nickname)
+-        if self.cert_der is None:
+-            raise ValueError('cert with nickname "%s" not in database "%s"' % (cert_nickname, db_name))
+ 
+-    def tearDown(self):
++    @classmethod
++    def teardown_class(cls):
+         nss.nss_shutdown()
++        cls.basedir.cleanup()
++        del cls.basedir
+ 
+     def test_export(self):
+-        if verbose:
+-            print("test_export")
+-        pkcs12_data = nss.pkcs12_export(cert_nickname, pk12_passwd)
+-        with open(exported_pk12_filename, 'wb') as f:
+-            f.write(pkcs12_data)
++        logger.debug("test_export")
++        pkcs12_data = nss.pkcs12_export(self.certdb.client_nickname, pk12_passwd)
++
++        pk12 = pk12_tempfile(self.certdb)
++        pk12_filename = pk12.name
+ 
+         pk12_listing = list_pk12(pk12_filename)
+-        pk12_listing = strip_key_from_pk12_listing(pk12_listing)
++        pk12_listing = strip_key_from_pk12_listing(pk12_listing.decode("utf-8"))
+         pk12_listing = strip_salt_from_pk12_listing(pk12_listing)
+ 
+-        exported_pk12_listing = list_pk12(exported_pk12_filename)
+-        exported_pk12_listing = strip_key_from_pk12_listing(exported_pk12_listing)
++        with tempfile.NamedTemporaryFile(delete=False) as export_temp:
++            exported_pk12_filename = export_temp.name
++            export_temp.write(pkcs12_data)
++            export_temp.flush()
++            exported_pk12_listing = list_pk12(exported_pk12_filename)
++
++        exported_pk12_listing = strip_key_from_pk12_listing(exported_pk12_listing.decode("utf-8"))
+         exported_pk12_listing = strip_salt_from_pk12_listing(exported_pk12_listing)
+ 
+-        self.assertEqual(pk12_listing, exported_pk12_listing)
+-
+-if __name__ == '__main__':
+-    unittest.main()
++        assert pk12_listing == exported_pk12_listing
+diff --git a/test/util.py b/test/util.py
+index 2cf7535..1234876 100644
+--- a/test/util.py
++++ b/test/util.py
+@@ -1,40 +1,8 @@
+-import sys
+-import os
+-from distutils.util import get_platform
++import shutil
+ 
+-def get_build_dir():
+-    '''
+-    Walk from the current directory up until a directory is found
+-    which contains a regular file called "setup.py" and a directory
+-    called "build". If found return the fully qualified path to
+-    the build directory's platform specific directory, this is where
+-    the architecture specific build produced by setup.py is located.
+ 
+-    There is no API in distutils to return the platform specific
+-    directory so we use as much as distutils exposes, the rest was
+-    determined by looking at the source code for distutils.
+-
+-    If the build directory cannont be found in the tree None is returned.
+-    '''
+-    cwd = os.getcwd()
+-    path_components = cwd.split('/')
+-    while (len(path_components)):
+-        path = os.path.join('/', *path_components)
+-        setup_path = os.path.join(path, 'setup.py')
+-        build_path = os.path.join(path, 'build')
+-        # Does this directory contain the file "setup.py" and the directory "build"?
+-        if os.path.exists(setup_path) and os.path.exists(build_path) and \
+-           os.path.isfile(setup_path) and os.path.isdir(build_path):
+-            # Found, return the path contentated with the architecture
+-            # specific build directory
+-            platform_specifier = "lib.%s-%s" % (get_platform(), sys.version[0:3])
+-            return os.path.join(build_path, platform_specifier)
+-
+-        # Not found, ascend to parent directory and try again
+-        path_components.pop()
+-
+-    # Failed to find the build directory
+-    return None
+-
+-def insert_build_dir_into_path():
+-    sys.path.insert(0,get_build_dir())
++def resolve_path(program: str) -> str:
++    prog_path = shutil.which(program)
++    if prog_path is None:
++        raise RuntimeError("%s not found" % program)
++    return prog_path
+diff --git a/tox.ini b/tox.ini
+new file mode 100644
+index 0000000..6ace640
+--- /dev/null
++++ b/tox.ini
+@@ -0,0 +1,8 @@
++[tox]
++envlist = py310
++
++[testenv]
++deps =
++    pytest
++    pkgconfig
++commands = pytest {posargs}
+-- 
+2.37.3
+

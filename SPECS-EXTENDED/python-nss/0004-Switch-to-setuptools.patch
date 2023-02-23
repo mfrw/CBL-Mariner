@@ -1,0 +1,287 @@
+From 1b4d1e1c88202b5a291f651e81ac6851b4a50668 Mon Sep 17 00:00:00 2001
+From: David Shea <reallylongword@gmail.com>
+Date: Wed, 5 Oct 2022 21:35:56 -0400
+Subject: [PATCH 4/7] Switch to setuptools
+
+Migrate the build to the new thing, with PEP-517/518 style metadata
+where possible, and a setuptools setup.py to fill in the gaps of
+compiling a C extension.
+---
+ MANIFEST       |  42 -------------
+ MANIFEST.in    |   4 ++
+ pyproject.toml |  19 ++++++
+ setup.cfg      |   9 ++-
+ setup.py       | 158 +++++++++++++------------------------------------
+ 5 files changed, 71 insertions(+), 161 deletions(-)
+ delete mode 100644 MANIFEST
+ create mode 100644 MANIFEST.in
+ create mode 100644 pyproject.toml
+
+diff --git a/MANIFEST b/MANIFEST
+deleted file mode 100644
+index 84fc4ff..0000000
+--- a/MANIFEST
++++ /dev/null
+@@ -1,42 +0,0 @@
+-LICENSE.gpl
+-LICENSE.lgpl
+-LICENSE.mpl
+-README
+-setup.cfg
+-setup.py
+-doc/ChangeLog
+-doc/examples/pbkdf2_example.py
+-doc/examples/cert_dump.py
+-doc/examples/cert_trust.py
+-doc/examples/httplib_example.py
+-doc/examples/ssl_cipher_info.py
+-doc/examples/ssl_example.py
+-doc/examples/ssl_version_range.py
+-doc/examples/verify_server.py
+-doc/examples/verify_cert.py
+-test/run_tests
+-test/setup_certs.py
+-test/test_cert_components.py
+-test/test_cert_request.py
+-test/test_cipher.py
+-test/test_client_server.py
+-test/test_digest.py
+-test/test_misc.py
+-test/test_ocsp.py
+-test/test_pkcs12.py
+-test/util.py
+-src/NSPRerrs.h
+-src/SECerrs.h
+-src/SSLerrs.h
+-src/__init__.py
+-src/py_nspr_common.h
+-src/py_nspr_error.c
+-src/py_nspr_error.h
+-src/py_nspr_io.c
+-src/py_nspr_io.h
+-src/py_nss.c
+-src/py_nss.h
+-src/py_shared_doc.h
+-src/py_ssl.c
+-src/py_ssl.h
+-src/py_traceback.h
+diff --git a/MANIFEST.in b/MANIFEST.in
+new file mode 100644
+index 0000000..75a9006
+--- /dev/null
++++ b/MANIFEST.in
+@@ -0,0 +1,4 @@
++include doc/ChangeLog
++include doc/examples/*.py
++include test/run_tests test/setup_certs.py test/util.py
++include src/*.h
+diff --git a/pyproject.toml b/pyproject.toml
+new file mode 100644
+index 0000000..e21ab33
+--- /dev/null
++++ b/pyproject.toml
+@@ -0,0 +1,19 @@
++[build-system]
++requires = ["setuptools", "pkgconfig"]
++build-backend = "setuptools.build_meta"
++
++[project]
++name = "python-nss"
++version = "1.0.1"
++description = "Python bindings for Network Security Services (NSS) and Netscape Portable Runtime (NSPR)"
++readme = "README"
++
++[[project.authors]]
++name = "John Dennis"
++email = "jdennis@redhat.com"
++
++[project.urls]
++homepage = "http://www.mozilla.org/projects/security/pki/python-nss"
++
++[project.optional-dependencies]
++test = ["six"]
+diff --git a/setup.cfg b/setup.cfg
+index 9bfa2a2..84ebd62 100644
+--- a/setup.cfg
++++ b/setup.cfg
+@@ -1,3 +1,6 @@
+-[sdist]
+-formats = bztar
+-dist-dir =
++[metadata]
++platforms = "posix"
++version = attr: nss.__version__
++
++# NB: can be moved to pyproject.toml after PEP-639 becomes part of the packaging standard
++license = "GPL-2.0-or-later OR LGPL-2.1-or-later OR MPL-2.0"
+diff --git a/setup.py b/setup.py
+index 47f0e6a..137184b 100644
+--- a/setup.py
++++ b/setup.py
+@@ -2,121 +2,47 @@
+ # License, v. 2.0. If a copy of the MPL was not distributed with this
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+-import sys
+-import os.path
+-import codecs
+-
++from setuptools import setup, Extension
+ import pkgconfig
+ 
+-from distutils.core import setup, Extension
+-
+-def read(rel_path):
+-    here = os.path.abspath(os.path.dirname(__file__))
+-    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+-        return fp.read()
+-
+-def get_version(rel_path):
+-    for line in read(rel_path).splitlines():
+-        if line.startswith('__version__'):
+-            delim = '"' if '"' in line else "'"
+-            return line.split(delim)[1]
+-    raise RuntimeError("Unable to find version string.")
+-
+-name = 'python-nss'
+-version = get_version('src/__init__.py')
+-release = version
+-
+-#------------------------------------------------------------------------------
+-
+-def main(argv):
+-
+-    with open('README') as f:
+-        long_description = f.read()
+-
+-    debug_compile_args = ['-O0', '-g']
+-    extra_compile_args = []
+-    include_roots = []
+-
+-    for arg in argv[:]:
+-        if arg in ('--debug', ):
+-            print("compiling with debug")
+-            extra_compile_args += debug_compile_args
+-            argv.remove(arg)
+-        if arg in ('-t', '--trace'):
+-            print("compiling with trace")
+-            extra_compile_args += ['-DDEBUG']
+-            argv.remove(arg)
+-        if arg.startswith('--include-root'):
+-            include_roots.append(arg.split('--include-root=')[1])
+-            argv.remove(arg)
+-
+-    nss_deps = pkgconfig.parse('nss')
+-    nspr_deps = pkgconfig.parse('nspr')
+-
+-    nss_error_extension = \
+-        Extension('nss.error',
+-                  sources            = ['src/py_nspr_error.c'],
+-                  include_dirs       = nss_deps['include_dirs'] + nspr_deps['include_dirs'],
+-                  depends            = ['src/py_nspr_common.h', 'src/py_nspr_error.h',
+-                                         'src/NSPRerrs.h', 'src/SSLerrs.h', 'src/SECerrs.h'],
+-                  libraries          = nspr_deps['libraries'],
+-                  extra_compile_args = extra_compile_args,
+-                  )
+-
+-    nss_io_extension = \
+-        Extension('nss.io',
+-                  sources            = ['src/py_nspr_io.c'],
+-                  include_dirs       = nss_deps['include_dirs'] + nspr_deps['include_dirs'],
+-                  depends            = ['src/py_nspr_common.h', 'src/py_nspr_error.h', 'src/py_nspr_io.h'],
+-                  libraries          = nspr_deps['libraries'],
+-                  extra_compile_args = extra_compile_args,
+-                  )
+-
+-    nss_nss_extension = \
+-        Extension('nss.nss',
+-                  sources            = ['src/py_nss.c'],
+-                  include_dirs       = nss_deps['include_dirs'] + nspr_deps['include_dirs'],
+-                  depends            = ['src/py_nspr_common.h', 'src/py_nspr_error.h', 'src/py_nss.h'],
+-                  libraries          = nspr_deps['libraries'] + nss_deps['libraries'],
+-                  extra_compile_args = extra_compile_args,
+-                  )
+-
+-    nss_ssl_extension = \
+-        Extension('nss.ssl',
+-                  sources            = ['src/py_ssl.c'],
+-                  include_dirs       = nss_deps['include_dirs'] + nspr_deps['include_dirs'],
+-                  depends            = ['src/py_nspr_common.h', 'src/py_nspr_error.h', 'src/py_nspr_io.h',
+-                                        'src/py_ssl.h', 'src/py_nss.h'],
+-                  libraries          = nspr_deps['libraries'],
+-                  extra_compile_args = extra_compile_args,
+-                  )
+-
+-          #bug_tracker       = 'https://bugzilla.redhat.com/buglist.cgi?submit&component=python-nss&product=Fedora&classification=Fedora'
+-          #bug_enter     = 'https://bugzilla.redhat.com/enter_bug.cgi?component=python-nss&product=Fedora&classification=Fedora',
+-    setup(name             = name,
+-          version          = version,
+-          description      = 'Python bindings for Network Security Services (NSS) and Netscape Portable Runtime (NSPR)',
+-          long_description = long_description,
+-          author           = 'John Dennis',
+-          author_email     = 'jdennis@redhat.com',
+-          maintainer       = 'John Dennis',
+-          maintainer_email = 'jdennis@redhat.com',
+-          license          = 'MPLv2.0 or GPLv2+ or LGPLv2+',
+-          platforms        = 'posix',
+-          url              = 'http://www.mozilla.org/projects/security/pki/python-nss',
+-          download_url     = '',
+-          ext_modules      = [nss_error_extension,
+-                              nss_io_extension,
+-                              nss_nss_extension,
+-                              nss_ssl_extension,
+-                             ],
+-          package_dir      = {'nss':'src'},
+-          packages         = ['nss'],
+-    )
+-
+-    return 0
+-
+-#------------------------------------------------------------------------------
+-
+-if __name__ == "__main__":
+-    sys.exit(main(sys.argv))
++nss_deps = pkgconfig.parse("nss")
++nspr_deps = pkgconfig.parse("nspr")
++
++nss_error_extension = Extension(
++    "nss.error",
++    sources=["src/py_nspr_error.c"],
++    include_dirs=nss_deps["include_dirs"] + nspr_deps["include_dirs"] + ["src"],
++    depends=["src/py_nspr_common.h", "src/py_nspr_error.h", "src/NSPRerrs.h", "src/SSLerrs.h", "src/SECerrs.h"],
++    libraries=nspr_deps["libraries"],
++)
++
++nss_io_extension = Extension(
++    "nss.io",
++    sources=["src/py_nspr_io.c"],
++    include_dirs=nss_deps["include_dirs"] + nspr_deps["include_dirs"] + ["src"],
++    depends=["src/py_nspr_common.h", "src/py_nspr_error.h", "src/py_nspr_io.h"],
++    libraries=nspr_deps["libraries"],
++)
++
++nss_nss_extension = Extension(
++    "nss.nss",
++    sources=["src/py_nss.c"],
++    include_dirs=nss_deps["include_dirs"] + nspr_deps["include_dirs"] + ["src"],
++    depends=["src/py_nspr_common.h", "src/py_nspr_error.h", "src/py_nss.h"],
++    libraries=nspr_deps["libraries"] + nss_deps["libraries"],
++)
++
++nss_ssl_extension = Extension(
++    "nss.ssl",
++    sources=["src/py_ssl.c"],
++    include_dirs=nss_deps["include_dirs"] + nspr_deps["include_dirs"] + ["src"],
++    depends=["src/py_nspr_common.h", "src/py_nspr_error.h", "src/py_nspr_io.h", "src/py_ssl.h", "src/py_nss.h"],
++    libraries=nspr_deps["libraries"] + nss_deps["libraries"],
++)
++
++setup(
++    name="python-nss",
++    package_dir={"nss": "src"},
++    packages=["nss"],
++    ext_modules=[nss_error_extension, nss_io_extension, nss_nss_extension, nss_ssl_extension],
++)
+-- 
+2.37.3
+

@@ -1,0 +1,116 @@
+From 1b638ce9b56ff08bde491411d13bc550c488d4ac Mon Sep 17 00:00:00 2001
+From: David Shea <reallylongword@gmail.com>
+Date: Mon, 3 Oct 2022 22:57:03 -0400
+Subject: [PATCH 2/7] Remove the version number from setup.py
+
+Read the version number using __init__.py using the example code in the
+python packaging guide. Remove the update_version steps from setup.py
+since there is now a single source of truth for the version number.
+---
+ setup.py | 70 ++++++++++++--------------------------------------------
+ 1 file changed, 15 insertions(+), 55 deletions(-)
+
+diff --git a/setup.py b/setup.py
+index 5f23615..7304e70 100644
+--- a/setup.py
++++ b/setup.py
+@@ -3,49 +3,27 @@
+ # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ 
+ import sys
+-import os
+-import re
++import os.path
++import codecs
+ 
+ from distutils.core import setup, Extension
+-from distutils.command.build_py import build_py as _build_py
+-from distutils.command.sdist import sdist as _sdist
++
++def read(rel_path):
++    here = os.path.abspath(os.path.dirname(__file__))
++    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
++        return fp.read()
++
++def get_version(rel_path):
++    for line in read(rel_path).splitlines():
++        if line.startswith('__version__'):
++            delim = '"' if '"' in line else "'"
++            return line.split(delim)[1]
++    raise RuntimeError("Unable to find version string.")
+ 
+ name = 'python-nss'
+-version = "1.0.1"
++version = get_version('src/__init__.py')
+ release = version
+ 
+-def update_version():
+-    """If the version string in __init__.py doesn't match the current
+-    version then edit the file replacing the version string
+-    with the current version."""
+-
+-    version_file = 'src/__init__.py'
+-    tmp_file = 'src/__init__.tmp'
+-    version_re = re.compile("^\s*__version__\s*=\s*['\"]([^'\"]*)['\"]")
+-    need_to_update = False
+-    version_found = False
+-    with open(tmp_file, "w") as t:
+-        with open(version_file) as v:
+-            for line in v.readlines():
+-                match = version_re.search(line)
+-                if match:
+-                    version_found = True
+-                    file_version = match.group(1)
+-                    if file_version != version:
+-                        need_to_update = True
+-                        t.write("__version__ = '%s'\n" % version)
+-                else:
+-                    t.write(line)
+-        if not version_found:
+-            need_to_update = True
+-            t.write("__version__ = '%s'\n" % version)
+-
+-    if need_to_update:
+-        print("Updating version in \"%s\" to \"%s\"" % (version_file, version))
+-        os.rename(tmp_file, version_file)
+-    else:
+-        os.unlink(tmp_file)
+-
+ def find_include_dir(dir_names, include_files, include_roots=None):
+     '''
+     Locate an include directory on the system which contains the specified include files.
+@@ -75,21 +53,6 @@ def find_include_dir(dir_names, include_files, include_roots=None):
+                     return include_dir
+     raise ValueError("unable to locate include directory containing header files %s" % include_files)
+ 
+-class BuildPy(_build_py):
+-    """Specialized Python source builder."""
+-
+-    def run(self):
+-        update_version()
+-        _build_py.run(self)
+-
+-
+-class SDist(_sdist):
+-    """Specialized Python source builder."""
+-
+-    def run(self):
+-        update_version()
+-        _sdist.run(self)
+-
+ #------------------------------------------------------------------------------
+ 
+ def main(argv):
+@@ -176,9 +139,6 @@ def main(argv):
+                              ],
+           package_dir      = {'nss':'src'},
+           packages         = ['nss'],
+-          cmdclass         = {'build_py'      : BuildPy,
+-                              'sdist'         : SDist,
+-                             },
+     )
+ 
+     return 0
+-- 
+2.37.3
+
