@@ -1,0 +1,33 @@
+From a78d7610a7a3adc4cd80433bdded7d37e738eb12 Mon Sep 17 00:00:00 2001
+From: Gris Ge <fge@redhat.com>
+Date: Mon, 16 Jan 2023 11:56:16 +0800
+Subject: [PATCH] Workaround for Fedora rust packaging
+
+Signed-off-by: Gris Ge <fge@redhat.com>
+---
+ rust/src/lib/Cargo.toml | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/rust/src/lib/Cargo.toml b/rust/src/lib/Cargo.toml
+index 801b3e33..67c7f3dd 100644
+--- a/rust/src/lib/Cargo.toml
++++ b/rust/src/lib/Cargo.toml
+@@ -9,7 +9,7 @@ documentation = "https://nmstate.io"
+ repository = "https://github.com/nmstate/nmstate"
+ keywords = ["network", "linux"]
+ categories = ["network-programming", "os::linux-apis"]
+-rust-version = "1.58"
++rust-version = "1.60"
+ edition = "2018"
+ 
+ [lib]
+@@ -62,5 +62,5 @@ serde_yaml = "0.9"
+ 
+ [features]
+ default = ["query_apply", "gen_conf"]
+-query_apply = ["nispor", "nix", "zbus"]
++query_apply = ["dep:nispor", "dep:nix", "dep:zbus"]
+ gen_conf = []
+-- 
+2.39.0
+

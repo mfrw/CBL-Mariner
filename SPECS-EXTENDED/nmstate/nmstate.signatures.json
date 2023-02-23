@@ -1,0 +1,7 @@
+{
+ "Signatures": {
+  "nmstate-2.0.0.tar.gz": "3fd2aaf99d6975d14cfe907ac8f268a884823c356d8cfbd3f5207f7871048a0b",
+  "nmstate-2.0.0.tar.gz.asc": "67a16d57bd4ac4d09ac258d60846b65342bfda4f279e75c1acf87a71e1fd9155",
+  "nmstate.gpg": "3c7b12d7729fbf9d6f7525002f7961bc23f62eb355648fe897780af4c19f2d52"
+ }
+}
