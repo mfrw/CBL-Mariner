@@ -1,0 +1,14 @@
+--- fluidsynth-2.3.1.org/fluidsynth.service.in  2022-12-30 07:48:18.445912018 +0100
++++ fluidsynth-2.3.1/fluidsynth.service.in      2022-12-30 07:48:53.318076806 +0100
+@@ -19,9 +19,9 @@ ProtectControlGroups=true
+ PrivateUsers=yes
+ Type=notify
+ NotifyAccess=main
+-EnvironmentFile=@FLUID_DAEMON_ENV_FILE@
++EnvironmentFile=/etc/sysconfig/fluidsynth
+ EnvironmentFile=-%h/.config/fluidsynth
+-ExecStart=@CMAKE_INSTALL_FULL_BINDIR@/fluidsynth -is $OTHER_OPTS $SOUND_FONT
++ExecStart=/usr/bin/fluidsynth -is $OTHER_OPTS $SOUND_FONT
+ 
+ [Install]
+ WantedBy=default.target
