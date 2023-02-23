@@ -1,0 +1,504 @@
+From db9a311cb2bf17f9febdf5e31d28ca83af399cf9 Mon Sep 17 00:00:00 2001
+From: "Endi S. Dewata" <edewata@redhat.com>
+Date: Fri, 4 Jun 2021 12:20:45 -0500
+Subject: [PATCH] Drop log4j dependency
+
+---
+ pom.xml                                       | 25 -----
+ .../java/org/jboss/logging/Log4j2Logger.java  | 92 ------------------
+ .../jboss/logging/Log4j2LoggerProvider.java   | 96 -------------------
+ .../java/org/jboss/logging/Log4jLogger.java   | 74 --------------
+ .../jboss/logging/Log4jLoggerProvider.java    | 86 -----------------
+ .../org/jboss/logging/LoggerProviders.java    | 36 -------
+ 6 files changed, 409 deletions(-)
+ delete mode 100644 src/main/java/org/jboss/logging/Log4j2Logger.java
+ delete mode 100644 src/main/java/org/jboss/logging/Log4j2LoggerProvider.java
+ delete mode 100644 src/main/java/org/jboss/logging/Log4jLogger.java
+ delete mode 100644 src/main/java/org/jboss/logging/Log4jLoggerProvider.java
+
+diff --git a/pom.xml b/pom.xml
+index 60a9de3..88af23f 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -31,8 +31,6 @@
+ 
+     <properties>
+         <!-- Dependency versions -->
+-        <version.org.apache.log4j>1.2.16</version.org.apache.log4j>
+-        <version.org.apache.logging.log4j>2.11.2</version.org.apache.logging.log4j>
+         <version.org.jboss.logmanager>2.1.9.Final</version.org.jboss.logmanager>
+         <version.org.sfl4j>1.7.25</version.org.sfl4j>
+     </properties>
+@@ -44,28 +42,6 @@
+             <version>${version.org.jboss.logmanager}</version>
+             <scope>provided</scope>
+         </dependency>
+-        <dependency>
+-            <groupId>log4j</groupId>
+-            <artifactId>log4j</artifactId>
+-            <version>${version.org.apache.log4j}</version>
+-            <scope>provided</scope>
+-            <exclusions>
+-                <exclusion>
+-                    <groupId>com.sun.jdmk</groupId>
+-                    <artifactId>jmxtools</artifactId>
+-                </exclusion>
+-                <exclusion>
+-                    <groupId>com.sun.jmx</groupId>
+-                    <artifactId>jmxri</artifactId>
+-                </exclusion>
+-            </exclusions>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.apache.logging.log4j</groupId>
+-            <artifactId>log4j-api</artifactId>
+-            <version>${version.org.apache.logging.log4j}</version>
+-            <scope>provided</scope>
+-        </dependency>
+         <dependency>
+             <groupId>org.slf4j</groupId>
+             <artifactId>slf4j-api</artifactId>
+@@ -109,7 +85,6 @@
+                             ${project.groupId}.*;version=${project.version};-split-package:=error
+                         </Export-Package>
+                         <Import-Package>
+-                            org.apache.log4j.config;resolution:=optional,
+                             *;resolution:=optional
+                         </Import-Package>
+                     </instructions>
+diff --git a/src/main/java/org/jboss/logging/Log4j2Logger.java b/src/main/java/org/jboss/logging/Log4j2Logger.java
+deleted file mode 100644
+index 3603499..0000000
+--- a/src/main/java/org/jboss/logging/Log4j2Logger.java
++++ /dev/null
+@@ -1,92 +0,0 @@
+-/*
+- * JBoss, Home of Professional Open Source.
+- *
+- * Copyright 2013 Red Hat, Inc.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package org.jboss.logging;
+-
+-import org.apache.logging.log4j.LogManager;
+-import org.apache.logging.log4j.LoggingException;
+-import org.apache.logging.log4j.message.MessageFormatMessageFactory;
+-import org.apache.logging.log4j.message.StringFormattedMessage;
+-import org.apache.logging.log4j.spi.AbstractLogger;
+-
+-final class Log4j2Logger extends Logger {
+-
+-    private static final long serialVersionUID = -2507841068232627725L;
+-
+-    private final AbstractLogger logger;
+-    private final MessageFormatMessageFactory messageFactory;
+-
+-    Log4j2Logger(final String name) {
+-        super(name);
+-        org.apache.logging.log4j.Logger logger = LogManager.getLogger(name);
+-        if (!(logger instanceof AbstractLogger)) {
+-            throw new LoggingException("The logger for [" + name + "] does not extend AbstractLogger. Actual logger: " + logger.getClass().getName());
+-        }
+-        this.logger = (AbstractLogger)logger;
+-        this.messageFactory = new MessageFormatMessageFactory();
+-    }
+-
+-    @Override
+-    public boolean isEnabled(final Level level) {
+-        return this.logger.isEnabled(Log4j2Logger.translate(level));
+-    }
+-
+-    @Override
+-    protected void doLog(final Level level, final String loggerClassName, final Object message, final Object[] parameters, final Throwable thrown) {
+-        final org.apache.logging.log4j.Level translatedLevel = Log4j2Logger.translate(level);
+-        if (this.logger.isEnabled(translatedLevel)) {
+-            try {
+-                this.logger.logMessage(loggerClassName, translatedLevel, null,
+-                        (parameters == null || parameters.length == 0) ? this.messageFactory.newMessage(message) : this.messageFactory.newMessage(String.valueOf(message), parameters),
+-                        thrown);
+-            } catch (Throwable ignored) { }
+-        }
+-    }
+-
+-    @Override
+-    protected void doLogf(final Level level, final String loggerClassName, final String format, final Object[] parameters, final Throwable thrown) {
+-        final org.apache.logging.log4j.Level translatedLevel = Log4j2Logger.translate(level);
+-        if (this.logger.isEnabled(translatedLevel)) {
+-            try {
+-                this.logger.logMessage(loggerClassName, translatedLevel, null, new StringFormattedMessage(format, parameters), thrown);
+-            } catch (Throwable ignored) { }
+-        }
+-    }
+-
+-    private static org.apache.logging.log4j.Level translate(final Level level) {
+-        if (level == Level.TRACE) {
+-            return org.apache.logging.log4j.Level.TRACE;
+-        } else if (level == Level.DEBUG) {
+-            return org.apache.logging.log4j.Level.DEBUG;
+-        }
+-        return infoOrHigher(level);
+-    }
+-
+-    private static org.apache.logging.log4j.Level infoOrHigher(final Level level) {
+-        if (level == Level.INFO) {
+-            return org.apache.logging.log4j.Level.INFO;
+-        } else if (level == Level.WARN) {
+-            return org.apache.logging.log4j.Level.WARN;
+-        } else if (level == Level.ERROR) {
+-            return org.apache.logging.log4j.Level.ERROR;
+-        } else if (level == Level.FATAL) {
+-            return org.apache.logging.log4j.Level.FATAL;
+-        }
+-        return org.apache.logging.log4j.Level.ALL;
+-    }
+-}
+diff --git a/src/main/java/org/jboss/logging/Log4j2LoggerProvider.java b/src/main/java/org/jboss/logging/Log4j2LoggerProvider.java
+deleted file mode 100644
+index 84417d2..0000000
+--- a/src/main/java/org/jboss/logging/Log4j2LoggerProvider.java
++++ /dev/null
+@@ -1,96 +0,0 @@
+-/*
+- * JBoss, Home of Professional Open Source.
+- *
+- * Copyright 2013 Red Hat, Inc.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package org.jboss.logging;
+-
+-import java.util.HashMap;
+-import java.util.Map;
+-
+-import org.apache.logging.log4j.ThreadContext;
+-
+-final class Log4j2LoggerProvider implements LoggerProvider {
+-
+-    @Override
+-    public Log4j2Logger getLogger(String name) {
+-        return new Log4j2Logger(name);
+-    }
+-
+-    @Override
+-    public void clearMdc() {
+-        ThreadContext.clearMap();
+-    }
+-
+-    @Override
+-    public Object putMdc(String key, Object value) {
+-        try {
+-            return ThreadContext.get(key);
+-        } finally {
+-            ThreadContext.put(key, String.valueOf(value));
+-        }
+-    }
+-
+-    @Override
+-    public Object getMdc(String key) {
+-        return ThreadContext.get(key);
+-    }
+-
+-    @Override
+-    public void removeMdc(String key) {
+-        ThreadContext.remove(key);
+-    }
+-
+-    @Override
+-    public Map<String, Object> getMdcMap() {
+-        return new HashMap<String, Object>(ThreadContext.getImmutableContext());
+-    }
+-
+-    @Override
+-    public void clearNdc() {
+-        ThreadContext.clearStack();
+-    }
+-
+-    @Override
+-    public String getNdc() {
+-        return ThreadContext.peek();
+-    }
+-
+-    @Override
+-    public int getNdcDepth() {
+-        return ThreadContext.getDepth();
+-    }
+-
+-    @Override
+-    public String popNdc() {
+-        return ThreadContext.pop();
+-    }
+-
+-    @Override
+-    public String peekNdc() {
+-        return ThreadContext.peek();
+-    }
+-
+-    @Override
+-    public void pushNdc(String message) {
+-        ThreadContext.push(message);
+-    }
+-
+-    @Override
+-    public void setNdcMaxDepth(int maxDepth) {
+-        ThreadContext.trim(maxDepth);
+-    }
+-}
+diff --git a/src/main/java/org/jboss/logging/Log4jLogger.java b/src/main/java/org/jboss/logging/Log4jLogger.java
+deleted file mode 100644
+index 3f7a3f2..0000000
+--- a/src/main/java/org/jboss/logging/Log4jLogger.java
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/*
+- * JBoss, Home of Professional Open Source.
+- *
+- * Copyright 2010 Red Hat, Inc.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package org.jboss.logging;
+-
+-import java.text.MessageFormat;
+-
+-final class Log4jLogger extends Logger {
+-
+-    private static final long serialVersionUID = -5446154366955151335L;
+-
+-    private final org.apache.log4j.Logger logger;
+-
+-    Log4jLogger(final String name) {
+-        super(name);
+-        logger = org.apache.log4j.Logger.getLogger(name);
+-    }
+-
+-    public boolean isEnabled(final Level level) {
+-        final org.apache.log4j.Level l = translate(level);
+-        return logger.isEnabledFor(l) && l.isGreaterOrEqual(logger.getEffectiveLevel());
+-    }
+-
+-    protected void doLog(final Level level, final String loggerClassName, final Object message, final Object[] parameters, final Throwable thrown) {
+-        final org.apache.log4j.Level translatedLevel = translate(level);
+-        if (logger.isEnabledFor(translatedLevel)) try {
+-            logger.log(loggerClassName, translatedLevel, parameters == null || parameters.length == 0 ? message : MessageFormat.format(String.valueOf(message), parameters), thrown);
+-        } catch (Throwable ignored) {}
+-    }
+-
+-    protected void doLogf(final Level level, final String loggerClassName, final String format, final Object[] parameters, final Throwable thrown) {
+-        final org.apache.log4j.Level translatedLevel = translate(level);
+-        if (logger.isEnabledFor(translatedLevel)) try {
+-            logger.log(loggerClassName, translatedLevel, parameters == null ? String.format(format) : String.format(format, parameters), thrown);
+-        } catch (Throwable ignored) {}
+-    }
+-
+-    private static org.apache.log4j.Level translate(final Level level) {
+-        if (level == Level.TRACE) {
+-            return org.apache.log4j.Level.TRACE;
+-        } else if (level == Level.DEBUG) {
+-            return org.apache.log4j.Level.DEBUG;
+-        }
+-        return infoOrHigher(level);
+-    }
+-
+-    private static org.apache.log4j.Level infoOrHigher(final Level level) {
+-        if (level == Level.INFO) {
+-            return org.apache.log4j.Level.INFO;
+-        } else if (level == Level.WARN) {
+-            return org.apache.log4j.Level.WARN;
+-        } else if (level == Level.ERROR) {
+-            return org.apache.log4j.Level.ERROR;
+-        } else if (level == Level.FATAL) {
+-            return org.apache.log4j.Level.FATAL;
+-        }
+-        return org.apache.log4j.Level.ALL;
+-    }
+-}
+diff --git a/src/main/java/org/jboss/logging/Log4jLoggerProvider.java b/src/main/java/org/jboss/logging/Log4jLoggerProvider.java
+deleted file mode 100644
+index 69bdd5f..0000000
+--- a/src/main/java/org/jboss/logging/Log4jLoggerProvider.java
++++ /dev/null
+@@ -1,86 +0,0 @@
+-/*
+- * JBoss, Home of Professional Open Source.
+- *
+- * Copyright 2010 Red Hat, Inc.
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *     http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-package org.jboss.logging;
+-
+-import java.util.Collections;
+-import java.util.Map;
+-
+-import org.apache.log4j.MDC;
+-import org.apache.log4j.NDC;
+-
+-final class Log4jLoggerProvider implements LoggerProvider {
+-
+-    public Logger getLogger(final String name) {
+-        return new Log4jLogger("".equals(name) ? "ROOT" : name);
+-    }
+-
+-    public void clearMdc() {
+-        MDC.clear();
+-    }
+-
+-    public Object getMdc(String key) {
+-        return MDC.get(key);
+-    }
+-
+-    public Map<String, Object> getMdcMap() {
+-        @SuppressWarnings("unchecked")
+-        final Map<String, Object> map = MDC.getContext();
+-        return map == null ? Collections.<String, Object>emptyMap() : map;
+-    }
+-
+-    public Object putMdc(String key, Object val) {
+-        try {
+-            return MDC.get(key);
+-        } finally {
+-            MDC.put(key, val);
+-        }
+-    }
+-
+-    public void removeMdc(String key) {
+-        MDC.remove(key);
+-    }
+-
+-    public void clearNdc() {
+-        NDC.remove();
+-    }
+-
+-    public String getNdc() {
+-        return NDC.get();
+-    }
+-
+-    public int getNdcDepth() {
+-        return NDC.getDepth();
+-    }
+-
+-    public String peekNdc() {
+-        return NDC.peek();
+-    }
+-
+-    public String popNdc() {
+-        return NDC.pop();
+-    }
+-
+-    public void pushNdc(String message) {
+-        NDC.push(message);
+-    }
+-
+-    public void setNdcMaxDepth(int maxDepth) {
+-        NDC.setMaxDepth(maxDepth);
+-    }
+-}
+diff --git a/src/main/java/org/jboss/logging/LoggerProviders.java b/src/main/java/org/jboss/logging/LoggerProviders.java
+index 0608283..8e393d1 100644
+--- a/src/main/java/org/jboss/logging/LoggerProviders.java
++++ b/src/main/java/org/jboss/logging/LoggerProviders.java
+@@ -45,10 +45,6 @@ final class LoggerProviders {
+                     return tryJBossLogManager(cl, "system property");
+                 } else if ("jdk".equalsIgnoreCase(loggerProvider)) {
+                     return tryJDK("system property");
+-                } else if ("log4j2".equalsIgnoreCase(loggerProvider)) {
+-                    return tryLog4j2(cl, "system property");
+-                } else if ("log4j".equalsIgnoreCase(loggerProvider)) {
+-                    return tryLog4j(cl, "system property");
+                 } else if ("slf4j".equalsIgnoreCase(loggerProvider)) {
+                     return trySlf4j("system property");
+                 }
+@@ -80,17 +76,6 @@ final class LoggerProviders {
+         } catch (Throwable t) {
+             // nope...
+         }
+-        try {
+-            // MUST try Log4j 2.x BEFORE Log4j 1.x because Log4j 2.x also passes Log4j 1.x test in some circumstances
+-            return tryLog4j2(cl, null);
+-        } catch (Throwable t) {
+-            // nope...
+-        }
+-        try {
+-            return tryLog4j(cl, null);
+-        } catch (Throwable t) {
+-            // nope...
+-        }
+         try {
+             // only use slf4j if Logback is in use
+             Class.forName("ch.qos.logback.classic.Logger", false, cl);
+@@ -113,27 +98,6 @@ final class LoggerProviders {
+         return provider;
+     }
+ 
+-    // JBLOGGING-95 - Add support for Log4j 2.x
+-    private static LoggerProvider tryLog4j2(final ClassLoader cl, final String via) throws ClassNotFoundException {
+-        Class.forName("org.apache.logging.log4j.Logger", true, cl);
+-        Class.forName("org.apache.logging.log4j.LogManager", true, cl);
+-        Class.forName("org.apache.logging.log4j.spi.AbstractLogger", true, cl);
+-        LoggerProvider provider = new Log4j2LoggerProvider();
+-        // if Log4j 2 has a bad implementation that doesn't extend AbstractLogger, we won't know until getting the first logger throws an exception
+-        logProvider(provider, via);
+-        return provider;
+-    }
+-
+-    private static LoggerProvider tryLog4j(final ClassLoader cl, final String via) throws ClassNotFoundException {
+-        Class.forName("org.apache.log4j.LogManager", true, cl);
+-        // JBLOGGING-65 - slf4j can disguise itself as log4j.  Test for a class that slf4j doesn't provide.
+-        // JBLOGGING-94 - JBoss Logging does not detect org.apache.logging.log4j:log4j-1.2-api:2.0
+-        Class.forName("org.apache.log4j.config.PropertySetter", true, cl);
+-        final LoggerProvider provider = new Log4jLoggerProvider();
+-        logProvider(provider, via);
+-        return provider;
+-    }
+-
+     private static LoggerProvider tryJBossLogManager(final ClassLoader cl, final String via) throws ClassNotFoundException {
+         final Class<? extends LogManager> logManagerClass = LogManager.getLogManager().getClass();
+         if (logManagerClass == Class.forName("org.jboss.logmanager.LogManager", false, cl)
+-- 
+2.31.1
+
