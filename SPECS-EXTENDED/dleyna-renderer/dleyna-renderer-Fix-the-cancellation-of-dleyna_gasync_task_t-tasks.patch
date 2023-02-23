@@ -1,0 +1,385 @@
+From cc2e5d5f51e354e43c80ae0bbaf96f8bb4c9a3aa Mon Sep 17 00:00:00 2001
+From: Debarshi Ray <debarshir@freedesktop.org>
+Date: Fri, 4 Dec 2020 20:54:47 +0100
+Subject: [PATCH] Fix the cancellation of dleyna_gasync_task_t tasks
+
+When a GAsyncResult-based asynchronous operation is cancelled, by
+convention, it will always asynchronously invoke the
+GAsyncReadyCallback with the error set to G_IO_ERROR_CANCELLED.
+However, when the queues in a dleyna_task_processor_t are cancelled,
+the tasks within them are immediately destroyed. This means that a
+GAsyncReadyCallback shouldn't try to access a task after cancellation
+because it would be pointing to invalid memory.
+
+Here's an example:
+
+%0  prv_introspect_rc_cb (target=0x556be880d9f0,
+                          res=0x556be8840280,
+                          user_data=0x556be88fef70)
+    at device.c:835
+%1  dleyna_gasync_task_ready_cb (source=<optimized out>,
+                                 res=<optimized out>,
+                                 user_data=0x556be89a0ac0)
+    at gasync-task.c:75
+%2  g_task_return_now (task=0x556be8840280) at ../gio/gtask.c:1215
+%3  complete_in_idle_cb (task=task@entry=0x556be8840280)
+    at ../gio/gtask.c:1229
+%4  g_idle_dispatch (source=source@entry=0x556be8844e40,
+                     callback=0x7f87cd82b380 <complete_in_idle_cb>,
+                     user_data=0x556be8840280)
+    at ../glib/gmain.c:5836
+%5  g_main_dispatch (context=0x556be87e6be0) at ../glib/gmain.c:3325
+%6  g_main_context_dispatch (context=0x556be87e6be0)
+    at ../glib/gmain.c:4043
+%7  g_main_context_iterate.constprop.0 (context=0x556be87e6be0,
+                                        block=block@entry=1,
+                                        dispatch=dispatch@entry=1,
+                                        self=<optimized out>)
+    at ../glib/gmain.c:4119
+%8  g_main_loop_run (loop=0x556be8828130) at ../glib/gmain.c:4317
+%9  dleyna_main_loop_start (server=<optimized out>,
+                            control_point=<optimized out>,
+                            user_data=<optimized out>)
+    at libdleyna/core/main-loop.c:154
+%10 __libc_start_main (main=0x556be79fe0d0 <main>,
+                       argc=1, argv=0x7ffeb4610d98,
+                       init=<optimized out>,
+                       fini=<optimized out>,
+                       rtld_fini=<optimized out>,
+                       stack_end=0x7ffeb4610d88)
+    at ../csu/libc-start.c:314
+%11 0x0000556be79fe14e in _start ()
+
+Till now, dleyna_gasync_task_ready_cb was being used as the common
+GAsyncReadyCallback for all tasks. However, it doesn't support
+cancellation because that requires the use of the 'finish' counterpart
+of the specific asynchronous operation in question. Therefore, instead
+of a common GAsyncReadyCallback, each task needs to provide its own.
+
+Secondly, when cancelling a dleyna_gasync_task_t through
+dleyna_gasync_task_cancel_cb, dleyna_task_queue_task_completed should
+be called only if the task was current. Calling it for tasks that were
+waiting in the queue breaks the semantics of the processor because the
+running_tasks counter is an unsigned integer and can't accommodate
+negative values.
+
+https://bugzilla.redhat.com/show_bug.cgi?id=1900645
+https://github.com/phako/dleyna-renderer/pull/4
+---
+ libdleyna/renderer/device.c      | 83 ++++++++++++++++++++++++--------
+ libdleyna/renderer/gasync-task.c | 30 ++----------
+ libdleyna/renderer/gasync-task.h |  1 -
+ 3 files changed, 69 insertions(+), 45 deletions(-)
+
+diff --git a/libdleyna/renderer/device.c b/libdleyna/renderer/device.c
+index 525a23d978c7..4c0acb79c284 100644
+--- a/libdleyna/renderer/device.c
++++ b/libdleyna/renderer/device.c
+@@ -683,15 +683,23 @@ static void prv_get_protocol_info_cb(GObject *target,
+ 	gchar *result = NULL;
+ 	gboolean end;
+ 	GError *error = NULL;
+-	prv_new_device_ct_t *priv_t = (prv_new_device_ct_t *)user_data;
++	dleyna_gasync_task_t *task = NULL;
++	prv_new_device_ct_t *priv_t = NULL;
+ 	GUPnPServiceProxyAction *action;
+ 
+ 	DLEYNA_LOG_DEBUG("Enter");
+ 
+-	priv_t->dev->construct_step++;
+-
+ 	action = gupnp_service_proxy_call_action_finish(GUPNP_SERVICE_PROXY(target), res, &error);
+ 
++	if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
++		DLEYNA_LOG_WARNING("GetProtocolInfo operation cancelled");
++		goto on_error;
++	}
++
++	task = (dleyna_gasync_task_t *) user_data;
++	priv_t = (prv_new_device_ct_t *) dleyna_gasync_task_get_user_data (task);
++	priv_t->dev->construct_step++;
++
+ 	if (action == NULL || (error != NULL)) {
+ 		DLEYNA_LOG_WARNING("GetProtocolInfo operation failed: %s",
+ 				   ((error != NULL) ? error->message
+@@ -711,6 +719,9 @@ static void prv_get_protocol_info_cb(GObject *target,
+ 
+ on_error:
+ 
++	if (task)
++		dleyna_task_queue_task_completed (((dleyna_task_atom_t *) task)->queue_id);
++
+ 	if (action) {
+ 		gupnp_service_proxy_action_unref(action);
+ 	}
+@@ -769,7 +780,8 @@ static void prv_introspect_av_cb (GObject *target,
+ 				  GAsyncResult *res,
+ 				  gpointer user_data)
+ {
+-	prv_new_device_ct_t *priv_t = (prv_new_device_ct_t *)user_data;
++	dleyna_gasync_task_t *task = NULL;
++	prv_new_device_ct_t *priv_t = NULL;
+ 	GError *error = NULL;
+ 	GUPnPServiceIntrospection *introspection;
+ 	const GUPnPServiceStateVariableInfo *svi;
+@@ -779,10 +791,17 @@ static void prv_introspect_av_cb (GObject *target,
+ 
+ 	DLEYNA_LOG_DEBUG("Enter");
+ 
+-	priv_t->dev->construct_step++;
+-
+ 	introspection = prv_introspect_finish (GUPNP_SERVICE_INFO (target), res, &error);
+ 
++	if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
++		DLEYNA_LOG_WARNING("GetProtocolInfo operation cancelled");
++		goto on_error;
++	}
++
++	task = (dleyna_gasync_task_t *) user_data;
++	priv_t = (prv_new_device_ct_t *) dleyna_gasync_task_get_user_data (task);
++	priv_t->dev->construct_step++;
++
+ 	if (introspection == NULL || (error != NULL)) {
+ 		DLEYNA_LOG_WARNING("GetProtocolInfo operation failed: %s",
+ 				   ((error != NULL) ? error->message
+@@ -814,6 +833,9 @@ static void prv_introspect_av_cb (GObject *target,
+ 	priv_t->dev->can_get_byte_position = (sai != NULL);
+ 
+ on_error:
++	if (task)
++		dleyna_task_queue_task_completed (((dleyna_task_atom_t *) task)->queue_id);
++
+ 	g_clear_object(&introspection);
+ 
+ 	g_clear_error(&error);
+@@ -825,17 +847,25 @@ static void prv_introspect_rc_cb (GObject *target,
+ 				  GAsyncResult *res,
+ 				  gpointer user_data)
+ {
+-	prv_new_device_ct_t *priv_t = (prv_new_device_ct_t *)user_data;
++	dleyna_gasync_task_t *task = NULL;
++	prv_new_device_ct_t *priv_t = NULL;
+ 	GError *error = NULL;
+ 	GUPnPServiceIntrospection *introspection;
+ 	const GUPnPServiceStateVariableInfo *svi;
+ 
+ 	DLEYNA_LOG_DEBUG("Enter");
+ 
+-	priv_t->dev->construct_step++;
+-
+ 	introspection = prv_introspect_finish (GUPNP_SERVICE_INFO (target), res, &error);
+ 
++	if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
++		DLEYNA_LOG_WARNING("GetProtocolInfo operation cancelled");
++		goto on_error;
++	}
++
++	task = (dleyna_gasync_task_t *) user_data;
++	priv_t = (prv_new_device_ct_t *) dleyna_gasync_task_get_user_data (task);
++	priv_t->dev->construct_step++;
++
+ 	if (introspection == NULL || (error != NULL)) {
+ 		DLEYNA_LOG_WARNING("GetProtocolInfo operation failed: %s",
+ 				   ((error != NULL) ? error->message
+@@ -849,6 +879,9 @@ static void prv_introspect_rc_cb (GObject *target,
+ 		priv_t->dev->max_volume = g_value_get_uint(&svi->maximum);
+ 
+ on_error:
++	if (task)
++		dleyna_task_queue_task_completed (((dleyna_task_atom_t *) task)->queue_id);
++
+ 	g_clear_object(&introspection);
+ 
+ 	g_clear_error(&error);
+@@ -866,17 +899,27 @@ static gboolean prv_get_protocol_info(
+ 
+     gupnp_service_proxy_call_action_async(GUPNP_SERVICE_PROXY (target), action,
+             dleyna_gasync_task_get_cancellable (task),
+-            dleyna_gasync_task_ready_cb,
++            prv_get_protocol_info_cb,
+             task);
+ 
+     return FALSE;
+ }
+ 
+-static gboolean prv_introspect(dleyna_gasync_task_t *task, GObject *target)
++static gboolean prv_introspect_av(dleyna_gasync_task_t *task, GObject *target)
+ {
+ 	prv_introspect_async (GUPNP_SERVICE_INFO (target),
+ 			      dleyna_gasync_task_get_cancellable (task),
+-			      dleyna_gasync_task_ready_cb,
++			      prv_introspect_av_cb,
++			      task);
++
++	return FALSE;
++}
++
++static gboolean prv_introspect_rc(dleyna_gasync_task_t *task, GObject *target)
++{
++	prv_introspect_async (GUPNP_SERVICE_INFO (target),
++			      dleyna_gasync_task_get_cancellable (task),
++			      prv_introspect_rc_cb,
+ 			      task);
+ 
+ 	return FALSE;
+@@ -893,6 +936,8 @@ static gboolean prv_subscribe(dleyna_gasync_task_t *task, GObject *target)
+ 	device->construct_step++;
+ 	prv_device_subscribe_context(device);
+ 
++	dleyna_task_queue_task_completed (((dleyna_task_atom_t *) task)->queue_id);
++
+ 	DLEYNA_LOG_DEBUG("Exit");
+ 
+ 	return FALSE;
+@@ -924,6 +969,7 @@ static gboolean prv_declare(dleyna_gasync_task_t *task,
+ 				table + i);
+ 
+ 		if (!device->ids[i]) {
++			dleyna_task_processor_cancel_queue (((dleyna_task_atom_t *) task)->queue_id);
+ 			result = TRUE;
+ 			goto on_error;
+ 		}
+@@ -931,6 +977,8 @@ static gboolean prv_declare(dleyna_gasync_task_t *task,
+ 
+ on_error:
+ 
++	dleyna_task_queue_task_completed (((dleyna_task_atom_t *) task)->queue_id);
++
+ 	DLEYNA_LOG_DEBUG("Exit");
+ 
+ 	return result;
+@@ -972,7 +1020,6 @@ void dlr_device_construct(
+ 		dleyna_gasync_task_add(queue_id,
+ 				       prv_get_protocol_info,
+ 				       G_OBJECT(s_proxy),
+-				       prv_get_protocol_info_cb,
+ 				       cancellable,
+ 				       NULL, priv_t);
+ 
+@@ -982,9 +1029,8 @@ void dlr_device_construct(
+ 			dev->construct_step++;
+ 		} else {
+ 			dleyna_gasync_task_add(queue_id,
+-					       prv_introspect,
++					       prv_introspect_av,
+ 					       G_OBJECT(av_proxy),
+-					       prv_introspect_av_cb,
+ 					       cancellable,
+ 					       NULL, priv_t);
+ 		}
+@@ -996,9 +1042,8 @@ void dlr_device_construct(
+ 			dev->construct_step++;
+ 		} else {
+ 			dleyna_gasync_task_add(queue_id,
+-					       prv_introspect,
++					       prv_introspect_rc,
+ 					       G_OBJECT(rc_proxy),
+-					       prv_introspect_rc_cb,
+ 					       cancellable,
+ 					       NULL, priv_t);
+ 		}
+@@ -1007,11 +1052,11 @@ void dlr_device_construct(
+ 
+ 	/* The following task should always be completed */
+ 	dleyna_gasync_task_add(queue_id, prv_subscribe, G_OBJECT(s_proxy),
+-				NULL, NULL, NULL, dev);
++				NULL, NULL, dev);
+ 
+ 	if (dev->construct_step < 5)
+ 		dleyna_gasync_task_add(queue_id, prv_declare, G_OBJECT(s_proxy),
+-					NULL, NULL, g_free, priv_t);
++					NULL, g_free, priv_t);
+ 
+ 	dleyna_task_queue_start(queue_id);
+ 
+diff --git a/libdleyna/renderer/gasync-task.c b/libdleyna/renderer/gasync-task.c
+index 47a0ad567cc2..0c65a22b6235 100644
+--- a/libdleyna/renderer/gasync-task.c
++++ b/libdleyna/renderer/gasync-task.c
+@@ -25,9 +25,9 @@ struct dleyna_gasync_task_t_ {
+ 	dleyna_task_atom_t base;
+ 	dleyna_gasync_task_action action;
+ 	GObject *target;
+-	GAsyncReadyCallback callback;
+ 	GCancellable *cancellable;
+ 	GDestroyNotify free_func;
++	gboolean current;
+ 	gpointer cb_user_data;
+ };
+ 
+@@ -45,7 +45,6 @@ const char *dleyna_gasync_task_create_source(void)
+ void dleyna_gasync_task_add(const dleyna_task_queue_key_t *queue_id,
+ 		dleyna_gasync_task_action action,
+ 		GObject *target,
+-		GAsyncReadyCallback callback,
+ 		GCancellable *cancellable,
+ 		GDestroyNotify free_func,
+ 		gpointer cb_user_data)
+@@ -55,7 +54,6 @@ void dleyna_gasync_task_add(const dleyna_task_queue_key_t *queue_id,
+ 	task = g_new0(dleyna_gasync_task_t, 1);
+ 
+ 	task->action = action;
+-	task->callback = callback;
+ 	task->cancellable = cancellable;
+ 	task->free_func = free_func;
+ 	task->cb_user_data = cb_user_data;
+@@ -68,32 +66,13 @@ void dleyna_gasync_task_add(const dleyna_task_queue_key_t *queue_id,
+ 	dleyna_task_queue_add_task(queue_id, &task->base);
+ }
+ 
+-void dleyna_gasync_task_ready_cb(GObject *source, GAsyncResult *res, gpointer user_data)
+-{
+-	dleyna_gasync_task_t *task = (dleyna_gasync_task_t *)user_data;
+-
+-	task->callback(source, res, task->cb_user_data);
+-
+-	dleyna_task_queue_task_completed(task->base.queue_id);
+-}
+-
+ void dleyna_gasync_task_process_cb(dleyna_task_atom_t *atom,
+ 		gpointer user_data)
+ {
+-	gboolean failed = FALSE;
+-
+ 	dleyna_gasync_task_t *task = (dleyna_gasync_task_t *)atom;
+ 
+-	failed = task->action(task, task->target);
+-
+-	if (failed) {
+-		dleyna_task_processor_cancel_queue(task->base.queue_id);
+-		dleyna_task_queue_task_completed(task->base.queue_id);
+-	}
+-
+-	if (task->callback == NULL) {
+-		dleyna_task_queue_task_completed(task->base.queue_id);
+-	}
++	task->current = TRUE;
++	task->action(task, task->target);
+ }
+ 
+ void dleyna_gasync_task_cancel_cb(dleyna_task_atom_t *atom,
+@@ -105,7 +84,8 @@ void dleyna_gasync_task_cancel_cb(dleyna_task_atom_t *atom,
+ 		g_cancellable_cancel (task->cancellable);
+ 		task->cancellable = NULL;
+ 
+-		dleyna_task_queue_task_completed(task->base.queue_id);
++		if (task->current)
++			dleyna_task_queue_task_completed(task->base.queue_id);
+ 	}
+ }
+ 
+diff --git a/libdleyna/renderer/gasync-task.h b/libdleyna/renderer/gasync-task.h
+index 629e48ce35a3..443c44153098 100644
+--- a/libdleyna/renderer/gasync-task.h
++++ b/libdleyna/renderer/gasync-task.h
+@@ -36,7 +36,6 @@ const char *dleyna_gasync_task_create_source(void);
+ void dleyna_gasync_task_add(const dleyna_task_queue_key_t *queue_id,
+ 		dleyna_gasync_task_action action,
+ 		GObject *target,
+-		GAsyncReadyCallback callback,
+ 		GCancellable *cancellable,
+ 		GDestroyNotify free_func,
+ 		gpointer cb_user_data);
+-- 
+2.28.0
+
