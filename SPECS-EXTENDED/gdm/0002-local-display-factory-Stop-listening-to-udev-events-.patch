@@ -1,0 +1,153 @@
+From 307c683f00e1711973139837992ca0f6f55314a5 Mon Sep 17 00:00:00 2001
+From: Ray Strode <rstrode@redhat.com>
+Date: Tue, 22 Mar 2022 10:16:58 -0400
+Subject: [PATCH 2/2] local-display-factory: Stop listening to udev events when
+ necessary
+
+At the moment we still listen for udev events after we've determined
+the system has settled (or a timeout has happened).
+
+This means if there is a udev event late, the login screen could get
+brought back up while the user is using the system.
+
+This commit fixes that.
+---
+ daemon/gdm-local-display-factory.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/daemon/gdm-local-display-factory.c b/daemon/gdm-local-display-factory.c
+index 4a66ad8f..b3335cd4 100644
+--- a/daemon/gdm-local-display-factory.c
++++ b/daemon/gdm-local-display-factory.c
+@@ -683,60 +683,64 @@ udev_is_settled (GdmLocalDisplayFactory *factory)
+                 platform_device = g_udev_device_get_parent_with_subsystem (device, "platform", NULL);
+ 
+                 if (platform_device != NULL) {
+                         g_debug ("GdmLocalDisplayFactory: Found embedded platform graphics, proceeding.");
+                         factory->seat0_has_platform_graphics = TRUE;
+                         is_settled = TRUE;
+                         break;
+                 }
+ 
+                 pci_device = g_udev_device_get_parent_with_subsystem (device, "pci", NULL);
+ 
+                 if (pci_device != NULL) {
+                         gboolean boot_vga;
+ 
+                         boot_vga = g_udev_device_get_sysfs_attr_as_int (pci_device, "boot_vga");
+ 
+                         if (boot_vga == 1) {
+                                  g_debug ("GdmLocalDisplayFactory: Found primary PCI graphics adapter, proceeding.");
+                                  factory->seat0_has_boot_up_graphics = TRUE;
+                                  is_settled = TRUE;
+                                  break;
+                         } else {
+                                  g_debug ("GdmLocalDisplayFactory: Found secondary PCI graphics adapter, not proceeding yet.");
+                         }
+                 }
+                 node = next_node;
+         }
+ 
+         g_debug ("GdmLocalDisplayFactory: udev has %ssettled enough for graphics.", is_settled? "" : "not ");
+         g_list_free_full (devices, g_object_unref);
++
++        if (is_settled)
++                g_clear_signal_handler (&factory->uevent_handler_id, factory->gudev_client);
++
+         return is_settled;
+ }
+ #endif
+ 
+ static int
+ on_seat0_graphics_check_timeout (gpointer user_data)
+ {
+         GdmLocalDisplayFactory *factory = user_data;
+ 
+         factory->seat0_graphics_check_timeout_id = 0;
+ 
+         /* Simply try to re-add seat0. If it is there already (i.e. CanGraphical
+          * turned TRUE, then we'll find it and it will not be created again).
+          */
+         factory->seat0_graphics_check_timed_out = TRUE;
+         ensure_display_for_seat (factory, "seat0");
+ 
+         return G_SOURCE_REMOVE;
+ }
+ 
+ static void
+ ensure_display_for_seat (GdmLocalDisplayFactory *factory,
+                          const char             *seat_id)
+ {
+         int ret;
+         gboolean seat_supports_graphics;
+         gboolean is_seat0;
+         g_auto (GStrv) session_types = NULL;
+         const char *legacy_session_types[] = { "x11", NULL };
+         GdmDisplayStore *store;
+@@ -1260,63 +1264,60 @@ on_vt_changed (GIOChannel    *source,
+         if (factory->active_vt != GDM_INITIAL_VT) {
+                 g_debug ("GdmLocalDisplayFactory: active VT is not initial VT, so ignoring");
+                 return G_SOURCE_CONTINUE;
+         }
+ 
+         g_debug ("GdmLocalDisplayFactory: creating new display on seat0 because of VT change");
+ 
+         ensure_display_for_seat (factory, "seat0");
+ 
+         return G_SOURCE_CONTINUE;
+ }
+ #endif
+ 
+ #ifdef HAVE_UDEV
+ static void
+ on_uevent (GUdevClient *client,
+            const char  *action,
+            GUdevDevice *device,
+            GdmLocalDisplayFactory *factory)
+ {
+         if (!g_udev_device_get_device_file (device))
+                 return;
+ 
+         if (g_strcmp0 (action, "add") != 0 &&
+             g_strcmp0 (action, "change") != 0)
+                 return;
+ 
+         if (!udev_is_settled (factory))
+                 return;
+ 
+-        g_signal_handler_disconnect (factory->gudev_client, factory->uevent_handler_id);
+-        factory->uevent_handler_id = 0;
+-
+         gdm_settings_direct_reload ();
+         ensure_display_for_seat (factory, "seat0");
+ }
+ #endif
+ 
+ static void
+ gdm_local_display_factory_start_monitor (GdmLocalDisplayFactory *factory)
+ {
+         g_autoptr (GIOChannel) io_channel = NULL;
+         const char *subsystems[] = { "drm", NULL };
+ 
+         factory->seat_new_id = g_dbus_connection_signal_subscribe (factory->connection,
+                                                                          "org.freedesktop.login1",
+                                                                          "org.freedesktop.login1.Manager",
+                                                                          "SeatNew",
+                                                                          "/org/freedesktop/login1",
+                                                                          NULL,
+                                                                          G_DBUS_SIGNAL_FLAGS_NONE,
+                                                                          on_seat_new,
+                                                                          g_object_ref (factory),
+                                                                          g_object_unref);
+         factory->seat_removed_id = g_dbus_connection_signal_subscribe (factory->connection,
+                                                                              "org.freedesktop.login1",
+                                                                              "org.freedesktop.login1.Manager",
+                                                                              "SeatRemoved",
+                                                                              "/org/freedesktop/login1",
+                                                                              NULL,
+                                                                              G_DBUS_SIGNAL_FLAGS_NONE,
+                                                                              on_seat_removed,
+                                                                              g_object_ref (factory),
+-- 
+2.35.1
+
