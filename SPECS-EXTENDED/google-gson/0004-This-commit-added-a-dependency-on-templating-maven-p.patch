@@ -1,0 +1,91 @@
+From 7bc6b3dae1b948a40f81223acd8eb41e52240307 Mon Sep 17 00:00:00 2001
+From: Mat Booth <mat.booth@redhat.com>
+Date: Thu, 27 Aug 2020 11:31:46 +0100
+Subject: [PATCH 4/4] This commit added a dependency on
+ templating-maven-plugin, we don't want it nor need it, so we revert it
+ https://github.com/google/gson/commit/d84e26d
+
+---
+ gson/pom.xml                                  | 17 ----
+ .../google/gson/internal/GsonBuildConfig.java | 32 -------
+ gson/src/main/java/com/google/gson/Gson.java  | 15 +--
+ .../GsonVersionDiagnosticsTest.java           | 96 -------------------
+ .../gson/internal/GsonBuildConfigTest.java    | 33 -------
+ 5 files changed, 1 insertion(+), 192 deletions(-)
+ delete mode 100644 gson/src/main/java-templates/com/google/gson/internal/GsonBuildConfig.java
+ delete mode 100644 gson/src/test/java/com/google/gson/functional/GsonVersionDiagnosticsTest.java
+ delete mode 100644 gson/src/test/java/com/google/gson/internal/GsonBuildConfigTest.java
+
+diff --git a/gson/src/main/java/com/google/gson/Gson.java b/gson/src/main/java/com/google/gson/Gson.java
+index 27f3ee9..d584ece 100644
+--- a/gson/src/main/java/com/google/gson/Gson.java
++++ b/gson/src/main/java/com/google/gson/Gson.java
+@@ -37,7 +37,6 @@ import java.util.concurrent.atomic.AtomicLongArray;
+ 
+ import com.google.gson.internal.ConstructorConstructor;
+ import com.google.gson.internal.Excluder;
+-import com.google.gson.internal.GsonBuildConfig;
+ import com.google.gson.internal.LazilyParsedNumber;
+ import com.google.gson.internal.Primitives;
+ import com.google.gson.internal.Streams;
+@@ -462,7 +461,7 @@ public final class Gson {
+           return candidate;
+         }
+       }
+-      throw new IllegalArgumentException("GSON (" + GsonBuildConfig.VERSION + ") cannot handle " + type);
++      throw new IllegalArgumentException("GSON cannot handle " + type);
+     } finally {
+       threadCalls.remove(type);
+ 
+@@ -704,10 +703,6 @@ public final class Gson {
+       ((TypeAdapter<Object>) adapter).write(writer, src);
+     } catch (IOException e) {
+       throw new JsonIOException(e);
+-    } catch (AssertionError e) {
+-      AssertionError error = new AssertionError("AssertionError (GSON " + GsonBuildConfig.VERSION + "): " + e.getMessage());
+-      error.initCause(e);
+-      throw error;
+     } finally {
+       writer.setLenient(oldLenient);
+       writer.setHtmlSafe(oldHtmlSafe);
+@@ -784,10 +779,6 @@ public final class Gson {
+       Streams.write(jsonElement, writer);
+     } catch (IOException e) {
+       throw new JsonIOException(e);
+-    } catch (AssertionError e) {
+-      AssertionError error = new AssertionError("AssertionError (GSON " + GsonBuildConfig.VERSION + "): " + e.getMessage());
+-      error.initCause(e);
+-      throw error;
+     } finally {
+       writer.setLenient(oldLenient);
+       writer.setHtmlSafe(oldHtmlSafe);
+@@ -945,10 +936,6 @@ public final class Gson {
+     } catch (IOException e) {
+       // TODO(inder): Figure out whether it is indeed right to rethrow this as JsonSyntaxException
+       throw new JsonSyntaxException(e);
+-    } catch (AssertionError e) {
+-      AssertionError error = new AssertionError("AssertionError (GSON " + GsonBuildConfig.VERSION + "): " + e.getMessage());
+-      error.initCause(e);
+-      throw error;
+     } finally {
+       reader.setLenient(oldLenient);
+     }
+--- ./gson/src/main/java/com/google/gson/internal/reflect/ReflectionHelper.java.orig	2022-08-28 15:09:57.027580397 +0100
++++ ./gson/src/main/java/com/google/gson/internal/reflect/ReflectionHelper.java	2022-08-28 15:11:57.198151672 +0100
+@@ -1,7 +1,6 @@
+ package com.google.gson.internal.reflect;
+ 
+ import com.google.gson.JsonIOException;
+-import com.google.gson.internal.GsonBuildConfig;
+ import java.lang.reflect.Constructor;
+ import java.lang.reflect.Field;
+ 
+@@ -66,7 +65,7 @@ public class ReflectionHelper {
+   }
+ 
+   public static RuntimeException createExceptionForUnexpectedIllegalAccess(IllegalAccessException exception) {
+-    throw new RuntimeException("Unexpected IllegalAccessException occurred (Gson " + GsonBuildConfig.VERSION + "). "
++    throw new RuntimeException("Unexpected IllegalAccessException occurred (Gson). "
+         + "Certain ReflectionAccessFilter features require Java >= 9 to work correctly. If you are not using "
+         + "ReflectionAccessFilter, report this to the Gson maintainers.",
+         exception);
