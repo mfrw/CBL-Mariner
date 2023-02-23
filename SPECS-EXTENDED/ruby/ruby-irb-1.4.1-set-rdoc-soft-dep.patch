@@ -1,0 +1,35 @@
+From b24852058fc87c940252c8a711c60ae2eb298082 Mon Sep 17 00:00:00 2001
+From: Jun Aruga <jaruga@redhat.com>
+Date: Thu, 25 Aug 2022 20:11:34 +0200
+Subject: [PATCH] Require RDoc in `input-method.rb` again in a limited scope.
+
+RDoc is implemented as soft dependency in IRB. See how the rdoc is required in
+the files. I reverted the commit below.
+
+```
+$ grep -ril rdoc lib/
+lib/irb/cmd/help.rb
+lib/irb/completion.rb
+lib/irb/easter-egg.rb
+lib/irb/input-method.rb
+```
+---
+ lib/irb/input-method.rb | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/lib/irb/input-method.rb b/lib/irb/input-method.rb
+index a8227ca..b77fd32 100644
+--- a/lib/irb/input-method.rb
++++ b/lib/irb/input-method.rb
+@@ -320,6 +320,11 @@ def auto_indent(&block)
+         [195, 164], # The "ä" that appears when Alt+d is pressed on xterm.
+         [226, 136, 130] # The "∂" that appears when Alt+d in pressed on iTerm2.
+       ]
++      begin
++        require 'rdoc'
++      rescue LoadError
++        return nil
++      end
+ 
+       if just_cursor_moving and completion_journey_data.nil?
+         return nil

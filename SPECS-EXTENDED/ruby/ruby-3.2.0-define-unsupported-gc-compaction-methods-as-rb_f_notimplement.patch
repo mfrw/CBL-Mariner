@@ -1,0 +1,502 @@
+From 1b3502156a665e2782f366aa5ac8c3bfd7637ab8 Mon Sep 17 00:00:00 2001
+From: Mike Dalessio <mike.dalessio@gmail.com>
+Date: Mon, 23 May 2022 15:40:22 -0400
+Subject: [PATCH 1/2] Move compaction-related methods into gc.c
+
+These methods are removed from gc.rb and added to gc.c:
+
+- GC.compact
+- GC.auto_compact
+- GC.auto_compact=
+- GC.latest_compact_info
+- GC.verify_compaction_references
+
+This is a prefactor to allow setting these methods to
+`rb_f_notimplement` in a followup commit.
+---
+ gc.c  | 101 ++++++++++++++++++++++++++++++++++++++++++++++++++++------
+ gc.rb |  68 ---------------------------------------
+ 2 files changed, 91 insertions(+), 78 deletions(-)
+
+diff --git a/gc.c b/gc.c
+index ef9327df1f..1c35856c44 100644
+--- a/gc.c
++++ b/gc.c
+@@ -10164,8 +10164,20 @@ gc_update_references(rb_objspace_t *objspace)
+     gc_update_table_refs(objspace, finalizer_table);
+ }
+ 
++/*
++ *  call-seq:
++ *     GC.latest_compact_info -> {:considered=>{:T_CLASS=>11}, :moved=>{:T_CLASS=>11}}
++ *
++ *  Returns information about object moved in the most recent GC compaction.
++ *
++ * The returned hash has two keys :considered and :moved.  The hash for
++ * :considered lists the number of objects that were considered for movement
++ * by the compactor, and the :moved hash lists the number of objects that
++ * were actually moved.  Some objects can't be moved (maybe they were pinned)
++ * so these numbers can be used to calculate compaction efficiency.
++ */
+ static VALUE
+-gc_compact_stats(rb_execution_context_t *ec, VALUE self)
++gc_compact_stats(VALUE self)
+ {
+     size_t i;
+     rb_objspace_t *objspace = &rb_objspace;
+@@ -10238,22 +10250,70 @@ heap_check_moved_i(void *vstart, void *vend, size_t stride, void *data)
+     return 0;
+ }
+ 
++/*
++ *  call-seq:
++ *     GC.compact
++ *
++ * This function compacts objects together in Ruby's heap.  It eliminates
++ * unused space (or fragmentation) in the heap by moving objects in to that
++ * unused space.  This function returns a hash which contains statistics about
++ * which objects were moved.  See `GC.latest_gc_info` for details about
++ * compaction statistics.
++ *
++ * This method is implementation specific and not expected to be implemented
++ * in any implementation besides MRI.
++ */
+ static VALUE
+-gc_compact(rb_execution_context_t *ec, VALUE self)
++gc_compact(VALUE self)
+ {
+     /* Run GC with compaction enabled */
+-    gc_start_internal(ec, self, Qtrue, Qtrue, Qtrue, Qtrue);
++    gc_start_internal(NULL, self, Qtrue, Qtrue, Qtrue, Qtrue);
+ 
+-    return gc_compact_stats(ec, self);
++    return gc_compact_stats(self);
+ }
+ 
++/*
++ * call-seq:
++ *    GC.verify_compaction_references(toward: nil, double_heap: false) -> hash
++ *
++ * Verify compaction reference consistency.
++ *
++ * This method is implementation specific.  During compaction, objects that
++ * were moved are replaced with T_MOVED objects.  No object should have a
++ * reference to a T_MOVED object after compaction.
++ *
++ * This function doubles the heap to ensure room to move all objects,
++ * compacts the heap to make sure everything moves, updates all references,
++ * then performs a full GC.  If any object contains a reference to a T_MOVED
++ * object, that object should be pushed on the mark stack, and will
++ * make a SEGV.
++ */
+ static VALUE
+-gc_verify_compaction_references(rb_execution_context_t *ec, VALUE self, VALUE double_heap, VALUE toward_empty)
++gc_verify_compaction_references(int argc, VALUE *argv, VALUE self)
+ {
+     rb_objspace_t *objspace = &rb_objspace;
++    VALUE kwargs, double_heap = Qfalse, toward_empty = Qfalse;
++    static ID id_toward, id_double_heap, id_empty;
++
++    if (!id_toward) {
++        id_toward = rb_intern("toward");
++        id_double_heap = rb_intern("double_heap");
++        id_empty = rb_intern("empty");
++    }
++
++    rb_scan_args(argc, argv, ":", &kwargs);
++    if (!NIL_P(kwargs)) {
++        if (rb_hash_has_key(kwargs, ID2SYM(id_toward))) {
++            VALUE toward = rb_hash_aref(kwargs, ID2SYM(id_toward));
++            toward_empty = (toward == ID2SYM(id_empty)) ? Qtrue : Qfalse;
++        }
++        if (rb_hash_has_key(kwargs, ID2SYM(id_double_heap))) {
++            double_heap = rb_hash_aref(kwargs, ID2SYM(id_double_heap));
++        }
++    }
+ 
+     /* Clear the heap. */
+-    gc_start_internal(ec, self, Qtrue, Qtrue, Qtrue, Qfalse);
++    gc_start_internal(NULL, self, Qtrue, Qtrue, Qtrue, Qfalse);
+ 
+     RB_VM_LOCK_ENTER();
+     {
+@@ -10273,12 +10333,12 @@ gc_verify_compaction_references(rb_execution_context_t *ec, VALUE self, VALUE do
+     }
+     RB_VM_LOCK_LEAVE();
+ 
+-    gc_start_internal(ec, self, Qtrue, Qtrue, Qtrue, Qtrue);
++    gc_start_internal(NULL, self, Qtrue, Qtrue, Qtrue, Qtrue);
+ 
+     objspace_reachable_objects_from_root(objspace, root_obj_check_moved_i, NULL);
+     objspace_each_objects(objspace, heap_check_moved_i, NULL, TRUE);
+ 
+-    return gc_compact_stats(ec, self);
++    return gc_compact_stats(self);
+ }
+ 
+ VALUE
+@@ -10739,8 +10799,18 @@ gc_disable(rb_execution_context_t *ec, VALUE _)
+     return rb_gc_disable();
+ }
+ 
++/*
++ *  call-seq:
++ *     GC.auto_compact = flag
++ *
++ *  Updates automatic compaction mode.
++ *
++ *  When enabled, the compactor will execute on every major collection.
++ *
++ *  Enabling compaction will degrade performance on major collections.
++ */
+ static VALUE
+-gc_set_auto_compact(rb_execution_context_t *ec, VALUE _, VALUE v)
++gc_set_auto_compact(VALUE _, VALUE v)
+ {
+     /* If not MinGW, Windows, or does not have mmap, we cannot use mprotect for
+      * the read barrier, so we must disable automatic compaction. */
+@@ -10754,8 +10824,14 @@ gc_set_auto_compact(rb_execution_context_t *ec, VALUE _, VALUE v)
+     return v;
+ }
+ 
++/*
++ *  call-seq:
++ *     GC.auto_compact    -> true or false
++ *
++ *  Returns whether or not automatic compaction has been enabled.
++ */
+ static VALUE
+-gc_get_auto_compact(rb_execution_context_t *ec, VALUE _)
++gc_get_auto_compact(VALUE _)
+ {
+     return RBOOL(ruby_enable_autocompact);
+ }
+@@ -13617,6 +13693,11 @@ Init_GC(void)
+     rb_define_singleton_method(rb_mGC, "malloc_allocated_size", gc_malloc_allocated_size, 0);
+     rb_define_singleton_method(rb_mGC, "malloc_allocations", gc_malloc_allocations, 0);
+ #endif
++    rb_define_singleton_method(rb_mGC, "compact", gc_compact, 0);
++    rb_define_singleton_method(rb_mGC, "auto_compact", gc_get_auto_compact, 0);
++    rb_define_singleton_method(rb_mGC, "auto_compact=", gc_set_auto_compact, 1);
++    rb_define_singleton_method(rb_mGC, "latest_compact_info", gc_compact_stats, 0);
++    rb_define_singleton_method(rb_mGC, "verify_compaction_references", gc_verify_compaction_references, -1);
+ 
+ #if GC_DEBUG_STRESS_TO_CLASS
+     rb_define_singleton_method(rb_mGC, "add_stress_to_class", rb_gcdebug_add_stress_to_class, -1);
+diff --git a/gc.rb b/gc.rb
+index 72637f3796..9265dd7b57 100644
+--- a/gc.rb
++++ b/gc.rb
+@@ -38,27 +38,6 @@ def garbage_collect full_mark: true, immediate_mark: true, immediate_sweep: true
+     Primitive.gc_start_internal full_mark, immediate_mark, immediate_sweep, false
+   end
+ 
+-  #  call-seq:
+-  #     GC.auto_compact    -> true or false
+-  #
+-  #  Returns whether or not automatic compaction has been enabled.
+-  #
+-  def self.auto_compact
+-    Primitive.gc_get_auto_compact
+-  end
+-
+-  #  call-seq:
+-  #     GC.auto_compact = flag
+-  #
+-  #  Updates automatic compaction mode.
+-  #
+-  #  When enabled, the compactor will execute on every major collection.
+-  #
+-  #  Enabling compaction will degrade performance on major collections.
+-  def self.auto_compact=(flag)
+-    Primitive.gc_set_auto_compact(flag)
+-  end
+-
+   #  call-seq:
+   #     GC.enable    -> true or false
+   #
+@@ -210,53 +189,6 @@ def self.latest_gc_info hash_or_key = nil
+     Primitive.gc_latest_gc_info hash_or_key
+   end
+ 
+-  #  call-seq:
+-  #     GC.latest_compact_info -> {:considered=>{:T_CLASS=>11}, :moved=>{:T_CLASS=>11}}
+-  #
+-  #  Returns information about object moved in the most recent GC compaction.
+-  #
+-  # The returned hash has two keys :considered and :moved.  The hash for
+-  # :considered lists the number of objects that were considered for movement
+-  # by the compactor, and the :moved hash lists the number of objects that
+-  # were actually moved.  Some objects can't be moved (maybe they were pinned)
+-  # so these numbers can be used to calculate compaction efficiency.
+-  def self.latest_compact_info
+-    Primitive.gc_compact_stats
+-  end
+-
+-  #  call-seq:
+-  #     GC.compact
+-  #
+-  # This function compacts objects together in Ruby's heap.  It eliminates
+-  # unused space (or fragmentation) in the heap by moving objects in to that
+-  # unused space.  This function returns a hash which contains statistics about
+-  # which objects were moved.  See `GC.latest_gc_info` for details about
+-  # compaction statistics.
+-  #
+-  # This method is implementation specific and not expected to be implemented
+-  # in any implementation besides MRI.
+-  def self.compact
+-    Primitive.gc_compact
+-  end
+-
+-  # call-seq:
+-  #    GC.verify_compaction_references(toward: nil, double_heap: false) -> hash
+-  #
+-  # Verify compaction reference consistency.
+-  #
+-  # This method is implementation specific.  During compaction, objects that
+-  # were moved are replaced with T_MOVED objects.  No object should have a
+-  # reference to a T_MOVED object after compaction.
+-  #
+-  # This function doubles the heap to ensure room to move all objects,
+-  # compacts the heap to make sure everything moves, updates all references,
+-  # then performs a full GC.  If any object contains a reference to a T_MOVED
+-  # object, that object should be pushed on the mark stack, and will
+-  # make a SEGV.
+-  def self.verify_compaction_references(toward: nil, double_heap: false)
+-    Primitive.gc_verify_compaction_references(double_heap, toward == :empty)
+-  end
+-
+   # call-seq:
+   #     GC.using_rvargc? -> true or false
+   #
+
+From d3273559356db6852d1fd794f0f076fba100e09e Mon Sep 17 00:00:00 2001
+From: Mike Dalessio <mike.dalessio@gmail.com>
+Date: Mon, 23 May 2022 17:31:14 -0400
+Subject: [PATCH 2/2] Define unsupported GC compaction methods as
+ rb_f_notimplement
+
+Fixes [Bug #18779]
+
+Define the following methods as `rb_f_notimplement` on unsupported
+platforms:
+
+- GC.compact
+- GC.auto_compact
+- GC.auto_compact=
+- GC.latest_compact_info
+- GC.verify_compaction_references
+
+This change allows users to call `GC.respond_to?(:compact)` to
+properly test for compaction support. Previously, it was necessary to
+invoke `GC.compact` or `GC.verify_compaction_references` and check if
+those methods raised `NotImplementedError` to determine if compaction
+was supported.
+
+This follows the precedent set for other platform-specific
+methods. For example, in `process.c` for methods such as
+`Process.fork`, `Process.setpgid`, and `Process.getpriority`.
+---
+ gc.c                         | 31 +++++++++++++++----
+ test/ruby/test_gc_compact.rb | 58 ++++++++++++++++++++++++++----------
+ 2 files changed, 69 insertions(+), 20 deletions(-)
+
+diff --git a/gc.c b/gc.c
+index 92ed76cf96..d71924846a 100644
+--- a/gc.c
++++ b/gc.c
+@@ -9438,6 +9438,7 @@ gc_move(rb_objspace_t *objspace, VALUE scan, VALUE free, size_t slot_size)
+     return (VALUE)src;
+ }
+ 
++#if GC_COMPACTION_SUPPORTED
+ static int
+ compare_free_slots(const void *left, const void *right, void *dummy)
+ {
+@@ -9485,6 +9486,7 @@ gc_sort_heap_by_empty_slots(rb_objspace_t *objspace)
+         free(page_list);
+     }
+ }
++#endif
+ 
+ static void
+ gc_ref_update_array(rb_objspace_t * objspace, VALUE v)
+@@ -10164,6 +10166,7 @@ gc_update_references(rb_objspace_t *objspace)
+     gc_update_table_refs(objspace, finalizer_table);
+ }
+ 
++#if GC_COMPACTION_SUPPORTED
+ /*
+  *  call-seq:
+  *     GC.latest_compact_info -> {:considered=>{:T_CLASS=>11}, :moved=>{:T_CLASS=>11}}
+@@ -10200,7 +10203,11 @@ gc_compact_stats(VALUE self)
+ 
+     return h;
+ }
++#else
++#  define gc_compact_stats rb_f_notimplement
++#endif
+ 
++#if GC_COMPACTION_SUPPORTED
+ static void
+ root_obj_check_moved_i(const char *category, VALUE obj, void *data)
+ {
+@@ -10262,6 +10269,10 @@ heap_check_moved_i(void *vstart, void *vend, size_t stride, void *data)
+  *
+  * This method is implementation specific and not expected to be implemented
+  * in any implementation besides MRI.
++ *
++ * To test whether GC compaction is supported, use the idiom:
++ *
++ *   GC.respond_to?(:compact)
+  */
+ static VALUE
+ gc_compact(VALUE self)
+@@ -10271,7 +10282,11 @@ gc_compact(VALUE self)
+ 
+     return gc_compact_stats(self);
+ }
++#else
++#  define gc_compact rb_f_notimplement
++#endif
+ 
++#if GC_COMPACTION_SUPPORTED
+ /*
+  * call-seq:
+  *    GC.verify_compaction_references(toward: nil, double_heap: false) -> hash
+@@ -10340,6 +10355,9 @@ gc_verify_compaction_references(int argc, VALUE *argv, VALUE self)
+ 
+     return gc_compact_stats(self);
+ }
++#else
++#  define gc_verify_compaction_references rb_f_notimplement
++#endif
+ 
+ VALUE
+ rb_gc_start(void)
+@@ -10799,6 +10817,7 @@ gc_disable(rb_execution_context_t *ec, VALUE _)
+     return rb_gc_disable();
+ }
+ 
++#if GC_COMPACTION_SUPPORTED
+ /*
+  *  call-seq:
+  *     GC.auto_compact = flag
+@@ -10814,16 +10833,15 @@ gc_set_auto_compact(VALUE _, VALUE v)
+ {
+     /* If not MinGW, Windows, or does not have mmap, we cannot use mprotect for
+      * the read barrier, so we must disable automatic compaction. */
+-#if !defined(__MINGW32__) && !defined(_WIN32)
+-    if (!USE_MMAP_ALIGNED_ALLOC) {
+-        rb_raise(rb_eNotImpError, "Automatic compaction isn't available on this platform");
+-    }
+-#endif
+ 
+     ruby_enable_autocompact = RTEST(v);
+     return v;
+ }
++#else
++#  define gc_set_auto_compact rb_f_notimplement
++#endif
+ 
++#if GC_COMPACTION_SUPPORTED
+ /*
+  *  call-seq:
+  *     GC.auto_compact    -> true or false
+@@ -10835,6 +10853,9 @@ gc_get_auto_compact(VALUE _)
+ {
+     return RBOOL(ruby_enable_autocompact);
+ }
++#else
++#  define gc_get_auto_compact rb_f_notimplement
++#endif
+ 
+ static int
+ get_envparam_size(const char *name, size_t *default_value, size_t lower_bound)
+diff --git a/test/ruby/test_gc_compact.rb b/test/ruby/test_gc_compact.rb
+index 42ad028530..411d5eab69 100644
+--- a/test/ruby/test_gc_compact.rb
++++ b/test/ruby/test_gc_compact.rb
+@@ -9,14 +9,7 @@
+ end
+ 
+ class TestGCCompact < Test::Unit::TestCase
+-  module SupportsCompact
+-    def setup
+-      skip "autocompact not supported on this platform" unless supports_auto_compact?
+-      super
+-    end
+-
+-    private
+-
++  module CompactionSupportInspector
+     def supports_auto_compact?
+       return true unless defined?(Etc::SC_PAGE_SIZE)
+ 
+@@ -30,10 +23,19 @@ def supports_auto_compact?
+     end
+   end
+ 
+-  include SupportsCompact
++  module OmitUnlessCompactSupported
++    include CompactionSupportInspector
++
++    def setup
++      omit "autocompact not supported on this platform" unless supports_auto_compact?
++      super
++    end
++  end
++
++  include OmitUnlessCompactSupported
+ 
+   class AutoCompact < Test::Unit::TestCase
+-    include SupportsCompact
++    include OmitUnlessCompactSupported
+ 
+     def test_enable_autocompact
+       before = GC.auto_compact
+@@ -87,13 +89,39 @@ def test_implicit_compaction_does_something
+     end
+   end
+ 
+-  def os_page_size
+-    return true unless defined?(Etc::SC_PAGE_SIZE)
++  class CompactMethodsNotImplemented < Test::Unit::TestCase
++    include CompactionSupportInspector
++
++    def assert_not_implemented(method, *args)
++      omit "autocompact is supported on this platform" if supports_auto_compact?
++
++      assert_raise(NotImplementedError) { GC.send(method, *args) }
++      refute(GC.respond_to?(method), "GC.#{method} should be defined as rb_f_notimplement")
++    end
++
++    def test_gc_compact_not_implemented
++      assert_not_implemented(:compact)
++    end
++
++    def test_gc_auto_compact_get_not_implemented
++      assert_not_implemented(:auto_compact)
++    end
++
++    def test_gc_auto_compact_set_not_implemented
++      assert_not_implemented(:auto_compact=, true)
++    end
++
++    def test_gc_latest_compact_info_not_implemented
++      assert_not_implemented(:latest_compact_info)
++    end
++
++    def test_gc_verify_compaction_references_not_implemented
++      assert_not_implemented(:verify_compaction_references)
++    end
+   end
+ 
+-  def setup
+-    skip "autocompact not supported on this platform" unless supports_auto_compact?
+-    super
++  def os_page_size
++    return true unless defined?(Etc::SC_PAGE_SIZE)
+   end
+ 
+   def test_gc_compact_stats

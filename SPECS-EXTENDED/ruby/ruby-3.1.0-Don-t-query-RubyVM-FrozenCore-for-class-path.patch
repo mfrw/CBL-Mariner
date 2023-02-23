@@ -1,0 +1,43 @@
+From 0ade5611df9f981005eed32b369d1e699e520221 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?V=C3=ADt=20Ondruch?= <vondruch@redhat.com>
+Date: Thu, 10 Feb 2022 13:26:44 +0100
+Subject: [PATCH] Don't query `RubyVM::FrozenCore` for class path.
+
+The `RubyVM::FrozenCore` class path is corrupted during GC cycle and
+returns random garbage, which might result in segfault.
+
+But since it is easy to detect the `RubyVM::FrozenCore`, just provide
+the class path explicitly as a workaround.
+
+Other possibility would be to ignore `RubyVM::FrozenCore` simlarly as
+TracePoint API does:
+
+https://github.com/ruby/ruby/blob/46f6575157d4c2f6bbd5693896e26a65037e5552/vm_trace.c#L411
+---
+ vm.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/vm.c b/vm.c
+index 8ce8b279d4..3d189fa63a 100644
+--- a/vm.c
++++ b/vm.c
+@@ -479,7 +479,15 @@ rb_dtrace_setup(rb_execution_context_t *ec, VALUE klass, ID id,
+     }
+     type = BUILTIN_TYPE(klass);
+     if (type == T_CLASS || type == T_ICLASS || type == T_MODULE) {
+-	VALUE name = rb_class_path(klass);
++	VALUE name = Qnil;
++	/*
++	 * Special treatment for rb_mRubyVMFrozenCore wchi is broken by GC.
++         * https://bugs.ruby-lang.org/issues/18257
++	 */
++	if (klass == rb_mRubyVMFrozenCore)
++	    name = rb_str_new_cstr("RubyVM::FrozenCore");
++	else
++	    name = rb_class_path(klass);
+ 	const char *classname, *filename;
+ 	const char *methodname = rb_id2name(id);
+ 	if (methodname && (filename = rb_source_location_cstr(&args->line_no)) != 0) {
+-- 
+2.34.1
+

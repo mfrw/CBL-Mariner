@@ -1,0 +1,38 @@
+From 656f25987cf2885104d5b13c8d3f5b7d32f1b333 Mon Sep 17 00:00:00 2001
+From: Jean Boussier <jean.boussier@gmail.com>
+Date: Wed, 23 Nov 2022 12:10:36 +0100
+Subject: [PATCH] [ruby/cgi] Fix test_cgi_cookie_new_with_domain to pass on
+ older rubies
+
+https://github.com/ruby/cgi/commit/05f0c58048
+---
+ test/cgi/test_cgi_cookie.rb | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/test/cgi/test_cgi_cookie.rb b/test/cgi/test_cgi_cookie.rb
+index e3ec4bea5286..6d31932d321a 100644
+--- a/test/cgi/test_cgi_cookie.rb
++++ b/test/cgi/test_cgi_cookie.rb
+@@ -62,18 +62,18 @@ def test_cgi_cookie_new_complex
+ 
+   def test_cgi_cookie_new_with_domain
+     h = {'name'=>'name1', 'value'=>'value1'}
+-    cookie = CGI::Cookie.new('domain'=>'a.example.com', **h)
++    cookie = CGI::Cookie.new(h.merge('domain'=>'a.example.com'))
+     assert_equal('a.example.com', cookie.domain)
+ 
+-    cookie = CGI::Cookie.new('domain'=>'1.example.com', **h)
++    cookie = CGI::Cookie.new(h.merge('domain'=>'1.example.com'))
+     assert_equal('1.example.com', cookie.domain, 'enhanced by RFC 1123')
+ 
+     assert_raise(ArgumentError) {
+-      CGI::Cookie.new('domain'=>'-a.example.com', **h)
++      CGI::Cookie.new(h.merge('domain'=>'-a.example.com'))
+     }
+ 
+     assert_raise(ArgumentError) {
+-      CGI::Cookie.new('domain'=>'a-.example.com', **h)
++      CGI::Cookie.new(h.merge('domain'=>'a-.example.com'))
+     }
+   end
+ 

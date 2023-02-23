@@ -1,0 +1,502 @@
+--- ruby-3.1.3/gc.rbinc	2022-11-24 11:20:33.000000000 +0100
++++ ruby/gc.rbinc	2022-11-25 11:50:19.939820992 +0100
+@@ -9,27 +9,27 @@
+ #include "builtin.h"                /* for RB_BUILTIN_FUNCTION */
+ struct rb_execution_context_struct; /* in vm_core.h */
+ 
+-static VALUE builtin_inline_class_277(struct rb_execution_context_struct *ec, const VALUE self)
++static VALUE builtin_inline_class_209(struct rb_execution_context_struct *ec, const VALUE self)
+ {
+ MAYBE_UNUSED(const VALUE) flag = rb_vm_lvar(ec, -3);
+-#line 277 "gc.rb"
++#line 209 "gc.rb"
+ 
+       rb_objspace.flags.measure_gc = RTEST(flag) ? TRUE : FALSE;
+       return flag;
+ #line 20 "gc.rbinc"
+ }
+ 
+-static VALUE builtin_inline_class_289(struct rb_execution_context_struct *ec, const VALUE self)
++static VALUE builtin_inline_class_221(struct rb_execution_context_struct *ec, const VALUE self)
+ {
+-#line 289 "gc.rb"
++#line 221 "gc.rb"
+ return 
+       RBOOL(rb_objspace.flags.measure_gc);
+ #line 28 "gc.rbinc"
+ }
+ 
+-static VALUE builtin_inline_class_299(struct rb_execution_context_struct *ec, const VALUE self)
++static VALUE builtin_inline_class_231(struct rb_execution_context_struct *ec, const VALUE self)
+ {
+-#line 299 "gc.rb"
++#line 231 "gc.rb"
+ return 
+       ULL2NUM(rb_objspace.profile.total_time_ns);
+ #line 36 "gc.rbinc"
+@@ -52,31 +52,6 @@
+ }
+ 
+ static void
+-mjit_compile_invokebuiltin_for_gc_get_auto_compact(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+-{
+-    fprintf(f, "    VALUE self = GET_SELF();\n");
+-    fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE);\n");
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == gc_get_auto_compact */\n", (VALUE)gc_get_auto_compact);
+-    fprintf(f, "    val = f(ec, self);\n");
+-}
+-
+-static void
+-mjit_compile_invokebuiltin_for_gc_set_auto_compact(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+-{
+-    fprintf(f, "    VALUE self = GET_SELF();\n");
+-    fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE, VALUE);\n");
+-    if (index == -1) {
+-        fprintf(f, "    const VALUE *argv = &stack[%d];\n", stack_size - 1);
+-    }
+-    else {
+-        fprintf(f, "    const unsigned int lnum = GET_ISEQ()->body->local_table_size;\n");
+-        fprintf(f, "    const VALUE *argv = GET_EP() - lnum - VM_ENV_DATA_SIZE + 1 + %ld;\n", index);
+-    }
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == gc_set_auto_compact */\n", (VALUE)gc_set_auto_compact);
+-    fprintf(f, "    val = f(ec, self, argv[0]);\n");
+-}
+-
+-static void
+ mjit_compile_invokebuiltin_for_gc_enable(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+ {
+     fprintf(f, "    VALUE self = GET_SELF();\n");
+@@ -161,40 +136,6 @@
+ }
+ 
+ static void
+-mjit_compile_invokebuiltin_for_gc_compact_stats(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+-{
+-    fprintf(f, "    VALUE self = GET_SELF();\n");
+-    fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE);\n");
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == gc_compact_stats */\n", (VALUE)gc_compact_stats);
+-    fprintf(f, "    val = f(ec, self);\n");
+-}
+-
+-static void
+-mjit_compile_invokebuiltin_for_gc_compact(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+-{
+-    fprintf(f, "    VALUE self = GET_SELF();\n");
+-    fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE);\n");
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == gc_compact */\n", (VALUE)gc_compact);
+-    fprintf(f, "    val = f(ec, self);\n");
+-}
+-
+-static void
+-mjit_compile_invokebuiltin_for_gc_verify_compaction_references(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+-{
+-    fprintf(f, "    VALUE self = GET_SELF();\n");
+-    fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE, VALUE, VALUE);\n");
+-    if (index == -1) {
+-        fprintf(f, "    const VALUE *argv = &stack[%d];\n", stack_size - 2);
+-    }
+-    else {
+-        fprintf(f, "    const unsigned int lnum = GET_ISEQ()->body->local_table_size;\n");
+-        fprintf(f, "    const VALUE *argv = GET_EP() - lnum - VM_ENV_DATA_SIZE + 1 + %ld;\n", index);
+-    }
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == gc_verify_compaction_references */\n", (VALUE)gc_verify_compaction_references);
+-    fprintf(f, "    val = f(ec, self, argv[0], argv[1]);\n");
+-}
+-
+-static void
+ mjit_compile_invokebuiltin_for__bi0(FILE *f, long index, unsigned stack_size, bool inlinable_p)
+ {
+     fprintf(f, "    VALUE self = GET_SELF();\n");
+@@ -202,7 +143,7 @@
+     if (inlinable_p) {
+         fprintf(f, "%s", "    {\n");
+         fprintf(f, "%s", "    MAYBE_UNUSED(const VALUE) flag = rb_vm_lvar(ec, -3);\n");
+-        fprintf(f, "%s", "#line 277 \"gc.rb\"\n");
++        fprintf(f, "%s", "#line 209 \"gc.rb\"\n");
+         fprintf(f, "%s", "    \n");
+         fprintf(f, "%s", "          rb_objspace.flags.measure_gc = RTEST(flag) ? TRUE : FALSE;\n");
+         fprintf(f, "%s", "          return flag;\n");
+@@ -211,7 +152,7 @@
+         fprintf(f, "%s", "    \n");
+         return;
+     }
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == builtin_inline_class_277 */\n", (VALUE)builtin_inline_class_277);
++    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == builtin_inline_class_209 */\n", (VALUE)builtin_inline_class_209);
+     fprintf(f, "    val = f(ec, self);\n");
+ }
+ 
+@@ -222,7 +163,7 @@
+     fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE);\n");
+     if (inlinable_p) {
+         fprintf(f, "%s", "    {\n");
+-        fprintf(f, "%s", "#line 289 \"gc.rb\"\n");
++        fprintf(f, "%s", "#line 221 \"gc.rb\"\n");
+         fprintf(f, "%s", "    return \n");
+         fprintf(f, "%s", "          RBOOL(rb_objspace.flags.measure_gc);\n");
+         fprintf(f, "%s", "#line 52 \"gc.rbinc\"\n");
+@@ -230,7 +171,7 @@
+         fprintf(f, "%s", "    \n");
+         return;
+     }
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == builtin_inline_class_289 */\n", (VALUE)builtin_inline_class_289);
++    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == builtin_inline_class_221 */\n", (VALUE)builtin_inline_class_221);
+     fprintf(f, "    val = f(ec, self);\n");
+ }
+ 
+@@ -241,7 +182,7 @@
+     fprintf(f, "    typedef VALUE (*func)(rb_execution_context_t *, VALUE);\n");
+     if (inlinable_p) {
+         fprintf(f, "%s", "    {\n");
+-        fprintf(f, "%s", "#line 299 \"gc.rb\"\n");
++        fprintf(f, "%s", "#line 231 \"gc.rb\"\n");
+         fprintf(f, "%s", "    return \n");
+         fprintf(f, "%s", "          ULL2NUM(rb_objspace.profile.total_time_ns);\n");
+         fprintf(f, "%s", "#line 59 \"gc.rbinc\"\n");
+@@ -249,7 +190,7 @@
+         fprintf(f, "%s", "    \n");
+         return;
+     }
+-    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == builtin_inline_class_299 */\n", (VALUE)builtin_inline_class_299);
++    fprintf(f, "    func f = (func)%"PRIuVALUE"; /* == builtin_inline_class_231 */\n", (VALUE)builtin_inline_class_231);
+     fprintf(f, "    val = f(ec, self);\n");
+ }
+ 
+@@ -258,21 +199,16 @@
+   // table definition
+   static const struct rb_builtin_function gc_table[] = {
+     RB_BUILTIN_FUNCTION(0, gc_start_internal, gc_start_internal, 4, mjit_compile_invokebuiltin_for_gc_start_internal),
+-    RB_BUILTIN_FUNCTION(1, gc_get_auto_compact, gc_get_auto_compact, 0, mjit_compile_invokebuiltin_for_gc_get_auto_compact),
+-    RB_BUILTIN_FUNCTION(2, gc_set_auto_compact, gc_set_auto_compact, 1, mjit_compile_invokebuiltin_for_gc_set_auto_compact),
+-    RB_BUILTIN_FUNCTION(3, gc_enable, gc_enable, 0, mjit_compile_invokebuiltin_for_gc_enable),
+-    RB_BUILTIN_FUNCTION(4, gc_disable, gc_disable, 0, mjit_compile_invokebuiltin_for_gc_disable),
+-    RB_BUILTIN_FUNCTION(5, gc_stress_get, gc_stress_get, 0, mjit_compile_invokebuiltin_for_gc_stress_get),
+-    RB_BUILTIN_FUNCTION(6, gc_stress_set_m, gc_stress_set_m, 1, mjit_compile_invokebuiltin_for_gc_stress_set_m),
+-    RB_BUILTIN_FUNCTION(7, gc_count, gc_count, 0, mjit_compile_invokebuiltin_for_gc_count),
+-    RB_BUILTIN_FUNCTION(8, gc_stat, gc_stat, 1, mjit_compile_invokebuiltin_for_gc_stat),
+-    RB_BUILTIN_FUNCTION(9, gc_latest_gc_info, gc_latest_gc_info, 1, mjit_compile_invokebuiltin_for_gc_latest_gc_info),
+-    RB_BUILTIN_FUNCTION(10, gc_compact_stats, gc_compact_stats, 0, mjit_compile_invokebuiltin_for_gc_compact_stats),
+-    RB_BUILTIN_FUNCTION(11, gc_compact, gc_compact, 0, mjit_compile_invokebuiltin_for_gc_compact),
+-    RB_BUILTIN_FUNCTION(12, gc_verify_compaction_references, gc_verify_compaction_references, 2, mjit_compile_invokebuiltin_for_gc_verify_compaction_references),
+-    RB_BUILTIN_FUNCTION(13, _bi0, builtin_inline_class_277, 0, mjit_compile_invokebuiltin_for__bi0),
+-    RB_BUILTIN_FUNCTION(14, _bi1, builtin_inline_class_289, 0, mjit_compile_invokebuiltin_for__bi1),
+-    RB_BUILTIN_FUNCTION(15, _bi2, builtin_inline_class_299, 0, mjit_compile_invokebuiltin_for__bi2),
++    RB_BUILTIN_FUNCTION(1, gc_enable, gc_enable, 0, mjit_compile_invokebuiltin_for_gc_enable),
++    RB_BUILTIN_FUNCTION(2, gc_disable, gc_disable, 0, mjit_compile_invokebuiltin_for_gc_disable),
++    RB_BUILTIN_FUNCTION(3, gc_stress_get, gc_stress_get, 0, mjit_compile_invokebuiltin_for_gc_stress_get),
++    RB_BUILTIN_FUNCTION(4, gc_stress_set_m, gc_stress_set_m, 1, mjit_compile_invokebuiltin_for_gc_stress_set_m),
++    RB_BUILTIN_FUNCTION(5, gc_count, gc_count, 0, mjit_compile_invokebuiltin_for_gc_count),
++    RB_BUILTIN_FUNCTION(6, gc_stat, gc_stat, 1, mjit_compile_invokebuiltin_for_gc_stat),
++    RB_BUILTIN_FUNCTION(7, gc_latest_gc_info, gc_latest_gc_info, 1, mjit_compile_invokebuiltin_for_gc_latest_gc_info),
++    RB_BUILTIN_FUNCTION(8, _bi0, builtin_inline_class_209, 0, mjit_compile_invokebuiltin_for__bi0),
++    RB_BUILTIN_FUNCTION(9, _bi1, builtin_inline_class_221, 0, mjit_compile_invokebuiltin_for__bi1),
++    RB_BUILTIN_FUNCTION(10, _bi2, builtin_inline_class_231, 0, mjit_compile_invokebuiltin_for__bi2),
+     RB_BUILTIN_FUNCTION(-1, NULL, NULL, 0, 0),
+   };
+ 
+@@ -282,8 +218,6 @@
+ COMPILER_WARNING_ERROR(-Wincompatible-pointer-types)
+ #endif
+   if (0) rb_builtin_function_check_arity4(gc_start_internal);
+-  if (0) rb_builtin_function_check_arity0(gc_get_auto_compact);
+-  if (0) rb_builtin_function_check_arity1(gc_set_auto_compact);
+   if (0) rb_builtin_function_check_arity0(gc_enable);
+   if (0) rb_builtin_function_check_arity0(gc_disable);
+   if (0) rb_builtin_function_check_arity0(gc_stress_get);
+@@ -291,12 +225,9 @@
+   if (0) rb_builtin_function_check_arity0(gc_count);
+   if (0) rb_builtin_function_check_arity1(gc_stat);
+   if (0) rb_builtin_function_check_arity1(gc_latest_gc_info);
+-  if (0) rb_builtin_function_check_arity0(gc_compact_stats);
+-  if (0) rb_builtin_function_check_arity0(gc_compact);
+-  if (0) rb_builtin_function_check_arity2(gc_verify_compaction_references);
+-  if (0) rb_builtin_function_check_arity0(builtin_inline_class_277);
+-  if (0) rb_builtin_function_check_arity0(builtin_inline_class_289);
+-  if (0) rb_builtin_function_check_arity0(builtin_inline_class_299);
++  if (0) rb_builtin_function_check_arity0(builtin_inline_class_209);
++  if (0) rb_builtin_function_check_arity0(builtin_inline_class_221);
++  if (0) rb_builtin_function_check_arity0(builtin_inline_class_231);
+ COMPILER_WARNING_POP
+ 
+   // load
+--- ruby-3.1.3/miniprelude.c	2022-11-24 11:20:33.000000000 +0100
++++ ruby/miniprelude.c	2022-11-25 11:50:20.012820803 +0100
+@@ -545,11 +545,10 @@
+ 
+ static const char prelude_name2[] = "<internal:gc>";
+ static const struct {
+-    char L0[479]; /* 1..58 */
+-    char L58[508]; /* 59..204 */
+-    char L204[504]; /* 205..275 */
+-    char L275[490]; /* 276..306 */
+-    char L306[128]; /* 307..312 */
++    char L0[492]; /* 1..70 */
++    char L70[468]; /* 71..197 */
++    char L197[470]; /* 198..237 */
++    char L237[211]; /* 238..244 */
+ } prelude_code2 = {
+ #line 1 "gc.rb"
+ ""/* for gc.c */
+@@ -593,29 +592,6 @@
+ "  end\n"
+ "\n"
+ "\n"/*  call-seq: */
+-"\n"/*     GC.auto_compact    -> true or false */
+-"\n"/*  */
+-"\n"/*  Returns whether or not automatic compaction has been enabled. */
+-"\n"/*  */
+-"  def self.auto_compact\n"
+-"    Primitive.gc_get_auto_compact\n"
+-"  end\n"
+-"\n"
+-"\n"/*  call-seq: */
+-"\n"/*     GC.auto_compact = flag */
+-"\n"/*  */
+-"\n"/*  Updates automatic compaction mode. */
+-"\n"/*  */
+-"\n"/*  When enabled, the compactor will execute on every major collection. */
+-"\n"/*  */
+-"\n"/*  Enabling compaction will degrade performance on major collections. */
+-"  def self.auto_compact=(flag)\n"
+-,
+-#line 59 "gc.rb"
+-"    Primitive.gc_set_auto_compact(flag)\n"
+-"  end\n"
+-"\n"
+-"\n"/*  call-seq: */
+ "\n"/*     GC.enable    -> true or false */
+ "\n"/*  */
+ "\n"/*  Enables garbage collection, returning +true+ if garbage */
+@@ -645,6 +621,8 @@
+ "\n"/*    GC.stress	    -> integer, true or false */
+ "\n"/*  */
+ "\n"/*  Returns current status of GC stress mode. */
++,
++#line 71 "gc.rb"
+ "  def self.stress\n"
+ "    Primitive.gc_stress_get\n"
+ "  end\n"
+@@ -758,8 +736,6 @@
+ "\n"/*     GC.latest_gc_info(:major_by) -> :malloc */
+ "\n"/*  */
+ "\n"/*  Returns information about the most recent garbage collection. */
+-,
+-#line 205 "gc.rb"
+ "\n"/*  */
+ "\n"/* If the optional argument, hash, is given, */
+ "\n"/* it is overwritten and returned. */
+@@ -768,59 +744,14 @@
+ "    Primitive.gc_latest_gc_info hash_or_key\n"
+ "  end\n"
+ "\n"
+-"\n"/*  call-seq: */
+-"\n"/*     GC.latest_compact_info -> {:considered=>{:T_CLASS=>11}, :moved=>{:T_CLASS=>11}} */
+-"\n"/*  */
+-"\n"/*  Returns information about object moved in the most recent GC compaction. */
+-"\n"/*  */
+-"\n"/* The returned hash has two keys :considered and :moved.  The hash for */
+-"\n"/* :considered lists the number of objects that were considered for movement */
+-"\n"/* by the compactor, and the :moved hash lists the number of objects that */
+-"\n"/* were actually moved.  Some objects can't be moved (maybe they were pinned) */
+-"\n"/* so these numbers can be used to calculate compaction efficiency. */
+-"  def self.latest_compact_info\n"
+-"    Primitive.gc_compact_stats\n"
+-"  end\n"
+-"\n"
+-"\n"/*  call-seq: */
+-"\n"/*     GC.compact */
+-"\n"/*  */
+-"\n"/* This function compacts objects together in Ruby's heap.  It eliminates */
+-"\n"/* unused space (or fragmentation) in the heap by moving objects in to that */
+-"\n"/* unused space.  This function returns a hash which contains statistics about */
+-"\n"/* which objects were moved.  See `GC.latest_gc_info` for details about */
+-"\n"/* compaction statistics. */
+-"\n"/*  */
+-"\n"/* This method is implementation specific and not expected to be implemented */
+-"\n"/* in any implementation besides MRI. */
+-"  def self.compact\n"
+-"    Primitive.gc_compact\n"
+-"  end\n"
+-"\n"
+-"\n"/* call-seq: */
+-"\n"/*    GC.verify_compaction_references(toward: nil, double_heap: false) -> hash */
+-"\n"/*  */
+-"\n"/* Verify compaction reference consistency. */
+-"\n"/*  */
+-"\n"/* This method is implementation specific.  During compaction, objects that */
+-"\n"/* were moved are replaced with T_MOVED objects.  No object should have a */
+-"\n"/* reference to a T_MOVED object after compaction. */
+-"\n"/*  */
+-"\n"/* This function doubles the heap to ensure room to move all objects, */
+-"\n"/* compacts the heap to make sure everything moves, updates all references, */
+-"\n"/* then performs a full GC.  If any object contains a reference to a T_MOVED */
+-"\n"/* object, that object should be pushed on the mark stack, and will */
+-"\n"/* make a SEGV. */
+-"  def self.verify_compaction_references(toward: nil, double_heap: false)\n"
+-"    Primitive.gc_verify_compaction_references(double_heap, toward == :empty)\n"
+-"  end\n"
+-"\n"
+ "\n"/* call-seq: */
+ "\n"/*     GC.using_rvargc? -> true or false */
+ "\n"/*  */
+ "\n"/* Returns true if using experimental feature Variable Width Allocation, false */
+ "\n"/* otherwise. */
+ "  def self.using_rvargc?\n"/* :nodoc: */
++,
++#line 198 "gc.rb"
+ "    GC::INTERNAL_CONSTANTS[:SIZE_POOL_COUNT] > 1\n"
+ "  end\n"
+ "\n"
+@@ -831,8 +762,6 @@
+ "\n"/* Enable to measure GC time. */
+ "\n"/* You can get the result with <tt>GC.stat(:time)</tt>. */
+ "\n"/* Note that GC time measurement can cause some performance overhead. */
+-,
+-#line 276 "gc.rb"
+ "  def self.measure_total_time=(flag)\n"
+ "    Primitive.cstmt! %{\n"
+ "      rb_objspace.flags.measure_gc = RTEST(flag) ? TRUE : FALSE;\n"
+@@ -863,15 +792,15 @@
+ "end\n"
+ "\n"
+ "module ObjectSpace\n"
+-"  def garbage_collect full_mark: true, immediate_mark: true, immediate_sweep: true\n"
+ ,
+-#line 307 "gc.rb"
++#line 238 "gc.rb"
++"  def garbage_collect full_mark: true, immediate_mark: true, immediate_sweep: true\n"
+ "    Primitive.gc_start_internal full_mark, immediate_mark, immediate_sweep, false\n"
+ "  end\n"
+ "\n"
+ "  module_function :garbage_collect\n"
+ "end\n"
+-#line 875 "miniprelude.c"
++#line 804 "miniprelude.c"
+ };
+ 
+ static const char prelude_name3[] = "<internal:numeric>";
+@@ -1223,7 +1152,7 @@
+ "  end\n"
+ "\n"
+ "end\n"
+-#line 1227 "miniprelude.c"
++#line 1156 "miniprelude.c"
+ };
+ 
+ static const char prelude_name4[] = "<internal:io>";
+@@ -1354,7 +1283,7 @@
+ "    Primitive.io_write_nonblock(buf, exception)\n"
+ "  end\n"
+ "end\n"
+-#line 1358 "miniprelude.c"
++#line 1287 "miniprelude.c"
+ };
+ 
+ static const char prelude_name5[] = "<internal:marshal>";
+@@ -1402,7 +1331,7 @@
+ "    alias restore load\n"
+ "  end\n"
+ "end\n"
+-#line 1406 "miniprelude.c"
++#line 1335 "miniprelude.c"
+ };
+ 
+ static const char prelude_name6[] = "<internal:pack>";
+@@ -1724,7 +1653,7 @@
+ "    Primitive.pack_unpack1(fmt, offset)\n"
+ "  end\n"
+ "end\n"
+-#line 1728 "miniprelude.c"
++#line 1657 "miniprelude.c"
+ };
+ 
+ static const char prelude_name7[] = "<internal:trace_point>";
+@@ -2111,7 +2040,7 @@
+ "    Primitive.tracepoint_attr_instruction_sequence\n"
+ "  end\n"
+ "end\n"
+-#line 2115 "miniprelude.c"
++#line 2044 "miniprelude.c"
+ };
+ 
+ static const char prelude_name8[] = "<internal:warning>";
+@@ -2172,7 +2101,7 @@
+ "    Primitive.rb_warn_m(msgs, uplevel, category)\n"
+ "  end\n"
+ "end\n"
+-#line 2176 "miniprelude.c"
++#line 2105 "miniprelude.c"
+ };
+ 
+ static const char prelude_name9[] = "<internal:array>";
+@@ -2249,7 +2178,7 @@
+ "    end\n"
+ "  end\n"
+ "end\n"
+-#line 2253 "miniprelude.c"
++#line 2182 "miniprelude.c"
+ };
+ 
+ static const char prelude_name10[] = "<internal:kernel>";
+@@ -2438,7 +2367,7 @@
+ "    end\n"
+ "  end\n"
+ "end\n"
+-#line 2442 "miniprelude.c"
++#line 2371 "miniprelude.c"
+ };
+ 
+ static const char prelude_name11[] = "<internal:ractor>";
+@@ -3309,7 +3238,7 @@
+ "    }\n"
+ "  end\n"
+ "end\n"
+-#line 3313 "miniprelude.c"
++#line 3242 "miniprelude.c"
+ };
+ 
+ static const char prelude_name12[] = "<internal:timev>";
+@@ -3632,7 +3561,7 @@
+ "    Primitive.time_init_args(year, mon, mday, hour, min, sec, zone)\n"
+ "  end\n"
+ "end\n"
+-#line 3636 "miniprelude.c"
++#line 3565 "miniprelude.c"
+ };
+ 
+ static const char prelude_name13[] = "<internal:nilclass>";
+@@ -3665,7 +3594,7 @@
+ "    return 0.0\n"
+ "  end\n"
+ "end\n"
+-#line 3669 "miniprelude.c"
++#line 3598 "miniprelude.c"
+ };
+ 
+ static const char prelude_name14[] = "<internal:prelude>";
+@@ -3695,7 +3624,7 @@
+ "\n"
+ "  private :pp\n"
+ "end\n"
+-#line 3699 "miniprelude.c"
++#line 3628 "miniprelude.c"
+ };
+ 
+ static const char prelude_name15[] = "<internal:gem_prelude>";
+@@ -3722,7 +3651,7 @@
+ "rescue LoadError\n"
+ "  warn \"`did_you_mean' was not loaded.\"\n"
+ "end if defined?(DidYouMean)\n"
+-#line 3726 "miniprelude.c"
++#line 3655 "miniprelude.c"
+ };
+ 
+ static const char prelude_name16[] = "<internal:yjit>";
+@@ -4063,7 +3992,7 @@
+ "    end\n"
+ "  end\n"
+ "end\n"
+-#line 4067 "miniprelude.c"
++#line 3996 "miniprelude.c"
+ };
+ 
+ COMPILER_WARNING_POP

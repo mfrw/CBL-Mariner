@@ -1,0 +1,291 @@
+From 4d9cc9afa47981520d991d19fd78b322f1ba9f2a Mon Sep 17 00:00:00 2001
+From: Jarek Prokop <jprokop@redhat.com>
+Date: Wed, 22 Jun 2022 01:03:49 +0200
+Subject: [PATCH] Detect compaction support during runtime.
+
+The patch is created by backporting 3 commits from
+the upstream Ruby master branch in the chronological order below.
+
+https://github.com/ruby/ruby/commit/52d42e702375446746164a0251e1a10bce813b78
+https://github.com/ruby/ruby/commit/79eaaf2d0b641710613f16525e4b4c439dfe854e
+https://github.com/ruby/ruby/commit/2c190863239bee3f54cfb74b16bb6ea4cae6ed20
+
+== How to create this patch ==
+
+Download Ruby source code.
+```
+$ git clone https://github.com/ruby/ruby.git
+$ cd ruby
+```
+
+First create a commit squashed from the 3 commits above.
+Checkout the second commmit above, and create a temporary branch.
+```
+$ git checkout 79eaaf2d0b641710613f16525e4b4c439dfe854e
+$ git checkout -b wip/detect-compaction-runtime-tmp
+```
+
+Cherry pick the third commit on the second commit.
+```
+$ git cherry-pick 2c190863239bee3f54cfb74b16bb6ea4cae6ed20
+```
+
+Squash the last 3 commits on the branch.
+```
+$ git rebase -i 2223eb082afa6d05321b69df783d4133b9aacba6
+```
+
+Then checkout Ruby 3.1.2 branch.
+Create a new branch.
+Merge the Fedora Ruby's
+ruby-3.2.0-define-unsupported-gc-compaction-methods-as-rb_f_notimplement.patch.
+```
+$ git checkout v3_1_2
+$ git checkout -b wip/detect-compaction-runtime
+$ patch -p1 <
+~/fed/ruby/ruby-3.2.0-define-unsupported-gc-compaction-methods-as-rb_f_notimplement.patch
+$ git add gc.c gc.rb test/ruby/test_gc_compact.rb
+$ git commit
+```
+
+Merge the squashed one commit on the
+`wip/detect-compaction-runtime-tmp` branch
+into the `wip/detect-compaction-runtime` branch.
+```
+$ git cherry-pick <the squashed commit above>
+```
+
+Fix conflicts seeing the difference by `git show <the squashed commit
+above>`
+on another terminal.
+```
+$ vi gc.c
+$ git add gc.c
+$ git commit
+```
+
+== Notes for the patch ==
+
+```
++# define GC_COMPACTION_SUPPORTED (GC_CAN_COMPILE_COMPACTION && USE_MMAP_ALIGNED_ALLOC)
+```
+
+We use the USE_MMAP_ALIGNED_ALLOC instead of HEAP_PAGE_ALLOC_USE_MMAP on
+the line above. Because while the Ruby on the master branch replaced the
+USE_MMAP_ALIGNED_ALLOC with HEAP_PAGE_ALLOC_USE_MMAP, Ruby 3.1.2 doesn't.
+See <https://github.com/ruby/ruby/commit/fe21b7794af0cdb7ebd502e2c0da38c68fd89839>.
+
+```
++        rb_define_singleton_method(rb_mGC, "verify_compaction_references", gc_verify_compaction_references, -1);
+```
+
+We added the line in the case that GC_COMPACTION_SUPPORTED is true.
+Because while the Ruby on the master branch defines the
+GC.verify_compaction_references in the gc.rb in
+the case that GC_COMPACTION_SUPPORTED is true, Ruby 3.1.2
+doesn't define it in the gc.rb.
+See <https://github.com/ruby/ruby/commit/b96a3a6fd2093e1dbea5491c002da515652dd347>.
+
+```
++	OPT(GC_COMPACTION_SUPPORTED);
+```
+
+We added the line to expose the C macro to Ruby level.
+In Ruby the macro existance can then be checked like so:
+```Ruby
+GC::OPTS.include?("GC_COMPACTION_SUPPORTED")
+```
+It will return `true` if the GC_COMPACTION_SUPPORTED evaluates to `true` on the
+C level, `false` otherwise.
+See <https://github.com/ruby/ruby/blob/b96a3a6fd2093e1dbea5491c002da515652dd347/gc.c#L14091>
+
+== Original commit messages ==
+
+This is a combination of 3 commits.
+This is the 1st commit message:
+~~~
+Rename GC_COMPACTION_SUPPORTED
+
+Naming this macro GC_COMPACTION_SUPPORTED is misleading because it
+only checks whether compaction is supported at compile time.
+
+[Bug #18829]
+~~~
+
+This is the commit message #2:
+~~~
+Include runtime checks for compaction support
+
+Commit 0c36ba53192c5a0d245c9b626e4346a32d7d144e changed GC compaction
+methods to not be implemented when not supported. However, that commit
+only does compile time checks (which currently only checks for WASM),
+but there are additional compaction support checks during run time.
+
+This commit changes it so that GC compaction methods aren't defined
+during run time if the platform does not support GC compaction.
+
+[Bug #18829]
+~~~
+
+This is the commit message #3:
+~~~
+Suppress code unused unless GC_CAN_COMPILE_COMPACTION
+~~~
+---
+ gc.c | 63 +++++++++++++++++++++++++++++++++++++++++-------------------
+ 1 file changed, 43 insertions(+), 20 deletions(-)
+
+diff --git a/gc.c b/gc.c
+index 1c35856c44..bff0666a17 100644
+--- a/gc.c
++++ b/gc.c
+@@ -4984,6 +4984,23 @@ gc_unprotect_pages(rb_objspace_t *objspace, rb_heap_t *heap)
+ static void gc_update_references(rb_objspace_t * objspace);
+ static void invalidate_moved_page(rb_objspace_t *objspace, struct heap_page *page);
+ 
++#ifndef GC_CAN_COMPILE_COMPACTION
++#if defined(__wasi__) /* WebAssembly doesn't support signals */
++# define GC_CAN_COMPILE_COMPACTION 0
++#else
++# define GC_CAN_COMPILE_COMPACTION 1
++#endif
++#endif
++
++#if defined(__MINGW32__) || defined(_WIN32)
++# define GC_COMPACTION_SUPPORTED 1
++#else
++/* If not MinGW, Windows, or does not have mmap, we cannot use mprotect for
++ * the read barrier, so we must disable compaction. */
++# define GC_COMPACTION_SUPPORTED (GC_CAN_COMPILE_COMPACTION && USE_MMAP_ALIGNED_ALLOC)
++#endif
++
++#if GC_CAN_COMPILE_COMPACTION
+ static void
+ read_barrier_handler(uintptr_t address)
+ {
+@@ -5004,6 +5021,7 @@ read_barrier_handler(uintptr_t address)
+     }
+     RB_VM_LOCK_LEAVE();
+ }
++#endif
+ 
+ #if defined(_WIN32)
+ static LPTOP_LEVEL_EXCEPTION_FILTER old_handler;
+@@ -9267,13 +9285,7 @@ gc_start_internal(rb_execution_context_t *ec, VALUE self, VALUE full_mark, VALUE
+ 
+     /* For now, compact implies full mark / sweep, so ignore other flags */
+     if (RTEST(compact)) {
+-        /* If not MinGW, Windows, or does not have mmap, we cannot use mprotect for
+-         * the read barrier, so we must disable compaction. */
+-#if !defined(__MINGW32__) && !defined(_WIN32)
+-        if (!USE_MMAP_ALIGNED_ALLOC) {
+-            rb_raise(rb_eNotImpError, "Compaction isn't available on this platform");
+-        }
+-#endif
++        GC_ASSERT(GC_COMPACTION_SUPPORTED);
+ 
+         reason |= GPR_FLAG_COMPACT;
+     }
+@@ -9438,7 +9450,7 @@ gc_move(rb_objspace_t *objspace, VALUE scan, VALUE free, size_t slot_size)
+     return (VALUE)src;
+ }
+ 
+-#if GC_COMPACTION_SUPPORTED
++#if GC_CAN_COMPILE_COMPACTION
+ static int
+ compare_free_slots(const void *left, const void *right, void *dummy)
+ {
+@@ -10166,7 +10178,7 @@ gc_update_references(rb_objspace_t *objspace)
+     gc_update_table_refs(objspace, finalizer_table);
+ }
+ 
+-#if GC_COMPACTION_SUPPORTED
++#if GC_CAN_COMPILE_COMPACTION
+ /*
+  *  call-seq:
+  *     GC.latest_compact_info -> {:considered=>{:T_CLASS=>11}, :moved=>{:T_CLASS=>11}}
+@@ -10207,7 +10219,7 @@ gc_compact_stats(VALUE self)
+ #  define gc_compact_stats rb_f_notimplement
+ #endif
+ 
+-#if GC_COMPACTION_SUPPORTED
++#if GC_CAN_COMPILE_COMPACTION
+ static void
+ root_obj_check_moved_i(const char *category, VALUE obj, void *data)
+ {
+@@ -10286,7 +10298,7 @@ gc_compact(VALUE self)
+ #  define gc_compact rb_f_notimplement
+ #endif
+ 
+-#if GC_COMPACTION_SUPPORTED
++#if GC_CAN_COMPILE_COMPACTION
+ /*
+  * call-seq:
+  *    GC.verify_compaction_references(toward: nil, double_heap: false) -> hash
+@@ -10817,7 +10829,7 @@ gc_disable(rb_execution_context_t *ec, VALUE _)
+     return rb_gc_disable();
+ }
+ 
+-#if GC_COMPACTION_SUPPORTED
++#if GC_CAN_COMPILE_COMPACTION
+ /*
+  *  call-seq:
+  *     GC.auto_compact = flag
+@@ -10831,8 +10843,7 @@ gc_disable(rb_execution_context_t *ec, VALUE _)
+ static VALUE
+ gc_set_auto_compact(VALUE _, VALUE v)
+ {
+-    /* If not MinGW, Windows, or does not have mmap, we cannot use mprotect for
+-     * the read barrier, so we must disable automatic compaction. */
++    GC_ASSERT(GC_COMPACTION_SUPPORTED);
+ 
+     ruby_enable_autocompact = RTEST(v);
+     return v;
+@@ -10841,7 +10852,8 @@ gc_set_auto_compact(VALUE _, VALUE v)
+ #  define gc_set_auto_compact rb_f_notimplement
+ #endif
+ 
+-#if GC_COMPACTION_SUPPORTED
++
++#if GC_CAN_COMPILE_COMPACTION
+ /*
+  *  call-seq:
+  *     GC.auto_compact    -> true or false
+@@ -13714,11 +13726,21 @@ Init_GC(void)
+     rb_define_singleton_method(rb_mGC, "malloc_allocated_size", gc_malloc_allocated_size, 0);
+     rb_define_singleton_method(rb_mGC, "malloc_allocations", gc_malloc_allocations, 0);
+ #endif
+-    rb_define_singleton_method(rb_mGC, "compact", gc_compact, 0);
+-    rb_define_singleton_method(rb_mGC, "auto_compact", gc_get_auto_compact, 0);
+-    rb_define_singleton_method(rb_mGC, "auto_compact=", gc_set_auto_compact, 1);
+-    rb_define_singleton_method(rb_mGC, "latest_compact_info", gc_compact_stats, 0);
+-    rb_define_singleton_method(rb_mGC, "verify_compaction_references", gc_verify_compaction_references, -1);
++    if (GC_COMPACTION_SUPPORTED) {
++        rb_define_singleton_method(rb_mGC, "compact", gc_compact, 0);
++        rb_define_singleton_method(rb_mGC, "auto_compact", gc_get_auto_compact, 0);
++        rb_define_singleton_method(rb_mGC, "auto_compact=", gc_set_auto_compact, 1);
++        rb_define_singleton_method(rb_mGC, "latest_compact_info", gc_compact_stats, 0);
++        rb_define_singleton_method(rb_mGC, "verify_compaction_references", gc_verify_compaction_references, -1);
++    }
++    else {
++        rb_define_singleton_method(rb_mGC, "compact", rb_f_notimplement, 0);
++        rb_define_singleton_method(rb_mGC, "auto_compact", rb_f_notimplement, 0);
++        rb_define_singleton_method(rb_mGC, "auto_compact=", rb_f_notimplement, 1);
++        rb_define_singleton_method(rb_mGC, "latest_compact_info", rb_f_notimplement, 0);
++        /* When !GC_COMPACTION_SUPPORTED, this method is not defined in gc.rb */
++        rb_define_singleton_method(rb_mGC, "verify_compaction_references", rb_f_notimplement, -1);
++    }
+ 
+ #if GC_DEBUG_STRESS_TO_CLASS
+     rb_define_singleton_method(rb_mGC, "add_stress_to_class", rb_gcdebug_add_stress_to_class, -1);
+@@ -13742,6 +13764,7 @@ Init_GC(void)
+ 	OPT(MALLOC_ALLOCATED_SIZE);
+ 	OPT(MALLOC_ALLOCATED_SIZE_CHECK);
+ 	OPT(GC_PROFILE_DETAIL_MEMORY);
++	OPT(GC_COMPACTION_SUPPORTED);
+ #undef OPT
+ 	OBJ_FREEZE(opts);
+     }
+-- 
+2.36.1
+

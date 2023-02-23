@@ -1,0 +1,44 @@
+From 745dcf5326ea2c8e2047a3bddeb0fbb7e7d07649 Mon Sep 17 00:00:00 2001
+From: Xenor Chang <tubaxenor@gmail.com>
+Date: Mon, 28 Nov 2022 12:34:06 +0800
+Subject: [PATCH] [ruby/cgi] Loosen the domain regex to accept '.'
+ (https://github.com/ruby/cgi/pull/29)
+
+* Loosen the domain regex to accept '.'
+
+Co-authored-by: Nobuyoshi Nakada <nobu@ruby-lang.org>
+
+https://github.com/ruby/cgi/commit/5e09d632f3
+Co-authored-by: Hiroshi SHIBATA <hsbt@ruby-lang.org>
+---
+ lib/cgi/cookie.rb           | 2 +-
+ test/cgi/test_cgi_cookie.rb | 3 +++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/lib/cgi/cookie.rb b/lib/cgi/cookie.rb
+index 1a9c1a82c123..9498e2f9faf9 100644
+--- a/lib/cgi/cookie.rb
++++ b/lib/cgi/cookie.rb
+@@ -42,7 +42,7 @@ class Cookie < Array
+ 
+     TOKEN_RE = %r"\A[[!-~]&&[^()<>@,;:\\\"/?=\[\]{}]]+\z"
+     PATH_VALUE_RE = %r"\A[[ -~]&&[^;]]*\z"
+-    DOMAIN_VALUE_RE = %r"\A(?<label>(?!-)[-A-Za-z0-9]+(?<!-))(?:\.\g<label>)*\z"
++    DOMAIN_VALUE_RE = %r"\A\.?(?<label>(?!-)[-A-Za-z0-9]+(?<!-))(?:\.\g<label>)*\z"
+ 
+     # Create a new CGI::Cookie object.
+     #
+diff --git a/test/cgi/test_cgi_cookie.rb b/test/cgi/test_cgi_cookie.rb
+index 6d31932d321a..eadae4531365 100644
+--- a/test/cgi/test_cgi_cookie.rb
++++ b/test/cgi/test_cgi_cookie.rb
+@@ -65,6 +65,9 @@ def test_cgi_cookie_new_with_domain
+     cookie = CGI::Cookie.new(h.merge('domain'=>'a.example.com'))
+     assert_equal('a.example.com', cookie.domain)
+ 
++    cookie = CGI::Cookie.new(h.merge('domain'=>'.example.com'))
++    assert_equal('.example.com', cookie.domain)
++
+     cookie = CGI::Cookie.new(h.merge('domain'=>'1.example.com'))
+     assert_equal('1.example.com', cookie.domain, 'enhanced by RFC 1123')
+ 
