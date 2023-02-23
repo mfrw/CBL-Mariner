@@ -1,0 +1,73 @@
+diff --git a/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent/pom.xml b/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent/pom.xml
+index eee60c0..649991b 100644
+--- a/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent/pom.xml
++++ b/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent/pom.xml
+@@ -61,26 +61,19 @@
+                   <shadedPattern>io.prometheus.jmx.shaded.</shadedPattern>
+                   <includes>
+                     <include>org.yaml.**</include>
++                    <include>biz.source_code.**</include>
++                    <include>org.apache.**</include>
+                   </includes>
+-                </relocation>
+-              </relocations>
+-              <filters>
+-                <filter>
+-                  <artifact>io.prometheus.jmx:jmx_prometheus_javaagent_java6</artifact>
+                   <excludes>
+-                    <exclude>io/prometheus/jmx/shaded/org/yaml/snakeyaml/**</exclude>
+-                    <exclude>META-INF/maven/**</exclude>
++                    <exclude>io.prometheus.jmx.**</exclude>
+                   </excludes>
+-                  <includes>
+-                    <include>**</include>
+-                  </includes>
+-                </filter>
+-              </filters>
++                </relocation>
++              </relocations>
+               <transformers>
+                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                   <manifestEntries>
+-                    <Premain-Class>io.prometheus.jmx.shaded.io.prometheus.jmx.JavaAgent</Premain-Class>
+-                    <Agent-Class>io.prometheus.jmx.shaded.io.prometheus.jmx.JavaAgent</Agent-Class>
++                    <Premain-Class>io.prometheus.jmx.JavaAgent</Premain-Class>
++                    <Agent-Class>io.prometheus.jmx.JavaAgent</Agent-Class>
+                     <Implementation-Version>${project.version}</Implementation-Version>
+                     <Implementation-Title>${project.artifactId}</Implementation-Title>
+                   </manifestEntries>
+@@ -144,4 +137,4 @@
+     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+   </properties>
+-</project>
+\ No newline at end of file
++</project>
+diff --git a/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent_java6/pom.xml b/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent_java6/pom.xml
+index eff00e2..ed6ae36 100644
+--- a/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent_java6/pom.xml
++++ b/jmx_exporter-parent-0.16.1/jmx_prometheus_javaagent_java6/pom.xml
+@@ -67,9 +67,11 @@
+                 <include>javax.servlet.**</include>
+                 <include>org.eclipse.**</include>
+                 <include>org.yaml.**</include>
++                <include>biz.source_code.**</include>
++                <include>org.apache.**</include>
+               </includes>
+               <excludes>
+-                <exclude>io.prometheus.jmx.shaded.**</exclude>
++                <exclude>io.prometheus.jmx.**</exclude>
+               </excludes>
+             </relocation>
+           </relocations>
+@@ -86,8 +88,8 @@
+           <transformers>
+             <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+              <manifestEntries>
+-              <Premain-Class>io.prometheus.jmx.shaded.io.prometheus.jmx.JavaAgent</Premain-Class>
+-              <Agent-Class>io.prometheus.jmx.shaded.io.prometheus.jmx.JavaAgent</Agent-Class>
++              <Premain-Class>io.prometheus.jmx.JavaAgent</Premain-Class>
++              <Agent-Class>io.prometheus.jmx.JavaAgent</Agent-Class>
+               <Implementation-Version>${project.version}</Implementation-Version>
+               <Implementation-Title>${project.artifactId}</Implementation-Title>
+              </manifestEntries>
