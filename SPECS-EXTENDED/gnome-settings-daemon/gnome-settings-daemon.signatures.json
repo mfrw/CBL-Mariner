@@ -1,0 +1,6 @@
+{
+ "Signatures": {
+  "gnome-settings-daemon-42.2.tar.xz": "9c449714aa8ec1271c0db5137df3458195943f05ccd0ac8935d93397770bab00",
+  "org.gnome.settings-daemon.plugins.power.gschema.override": "dd8e62afe544cecb21c2c61113249bd76c3fc0aa478fca788bc0786c2992c094"
+ }
+}
