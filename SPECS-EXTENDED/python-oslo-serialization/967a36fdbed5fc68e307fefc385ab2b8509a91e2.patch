@@ -1,0 +1,37 @@
+From 967a36fdbed5fc68e307fefc385ab2b8509a91e2 Mon Sep 17 00:00:00 2001
+From: Stephen Finucane <sfinucan@redhat.com>
+Date: Mon, 1 Feb 2021 11:05:36 +0000
+Subject: [PATCH] Drop use of deprecated collections classes
+
+These were moved in Python 3.3 and the aliases will be removed in 3.10.
+
+Change-Id: If31797f8fc758468d153c364700db47452edf3dd
+Signed-off-by: Stephen Finucane <sfinucan@redhat.com>
+---
+ oslo_serialization/tests/test_jsonutils.py | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/oslo_serialization/tests/test_jsonutils.py b/oslo_serialization/tests/test_jsonutils.py
+index f076822..9c92235 100644
+--- a/oslo_serialization/tests/test_jsonutils.py
++++ b/oslo_serialization/tests/test_jsonutils.py
+@@ -14,6 +14,7 @@
+ #    under the License.
+ 
+ import collections
++import collections.abc
+ import datetime
+ import functools
+ import io
+@@ -241,9 +242,9 @@ def iteritems(self):
+         self.assertEqual({'iteritems': 'iteritems'}, p)
+ 
+     def test_mapping(self):
+-        # Make sure collections.Mapping is converted to a dict
++        # Make sure collections.abc.Mapping is converted to a dict
+         # and not a list.
+-        class MappingClass(collections.Mapping):
++        class MappingClass(collections.abc.Mapping):
+             def __init__(self):
+                 self.data = dict(a=1, b=2, c=3)
+ 

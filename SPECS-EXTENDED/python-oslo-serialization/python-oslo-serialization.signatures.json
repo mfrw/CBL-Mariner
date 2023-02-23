@@ -1,0 +1,7 @@
+{
+ "Signatures": {
+  "0x5d2d1e4fb8d38e6af76c50d53d4fec30cf5ce3da.txt": "2a6899396599fbf087b9644cfcf6333ea626e2b5a5646c667268615049dd873a",
+  "oslo.serialization-4.1.0.tar.gz": "cecc7794df806c85cb70dbd6c2b3af19bc68047ad29e3c6442be90a0a4de5379",
+  "oslo.serialization-4.1.0.tar.gz.asc": "0e3920f199c34e8a078ce50679957cc3de14d8aa2e1229000b0ff95cb1e06e7e"
+ }
+}
