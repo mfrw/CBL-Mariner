@@ -1,0 +1,39 @@
+From fbe59511ace6372b09cd34ca465d92bf69fa4edb Mon Sep 17 00:00:00 2001
+From: rfscholte <rfscholte@apache.org>
+Date: Fri, 26 Mar 2021 21:08:15 +0100
+Subject: [PATCH] #70 Jars of which modulename extraction cause an exception
+ should end up on the classpath
+
+---
+ .../codehaus/plexus/languages/java/jpms/LocationManager.java   | 3 +++
+ .../codehaus/plexus/languages/java/jpms/LocationManagerIT.java | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/plexus-java/src/main/java/org/codehaus/plexus/languages/java/jpms/LocationManager.java b/plexus-java/src/main/java/org/codehaus/plexus/languages/java/jpms/LocationManager.java
+index bec925a..94c094c 100644
+--- a/plexus-java/src/main/java/org/codehaus/plexus/languages/java/jpms/LocationManager.java
++++ b/plexus-java/src/main/java/org/codehaus/plexus/languages/java/jpms/LocationManager.java
+@@ -205,6 +205,9 @@ public class LocationManager
+             catch ( Exception e )
+             {
+                 result.getPathExceptions().put( t, e );
++
++                pathElements.put( t, null );
++
+                 continue;
+             }
+             
+diff --git a/plexus-java/src/test/java/org/codehaus/plexus/languages/java/jpms/LocationManagerIT.java b/plexus-java/src/test/java/org/codehaus/plexus/languages/java/jpms/LocationManagerIT.java
+index 41ddc75..c79a29f 100644
+--- a/plexus-java/src/test/java/org/codehaus/plexus/languages/java/jpms/LocationManagerIT.java
++++ b/plexus-java/src/test/java/org/codehaus/plexus/languages/java/jpms/LocationManagerIT.java
+@@ -132,5 +132,6 @@ public class LocationManagerIT
+         ResolvePathsResult<Path> result = locationManager.resolvePaths( request );
+         
+         assertThat( result.getPathExceptions().size(), is( 1 ) );
++        assertThat( result.getClasspathElements().size(), is(1) );
+     }
+ }
+-- 
+2.33.1
+
