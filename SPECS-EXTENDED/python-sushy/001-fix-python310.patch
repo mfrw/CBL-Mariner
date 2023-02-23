@@ -1,0 +1,44 @@
+commit 5b38ec591e2ea8df8f49fc956a2aecb7776a6656
+Author: Dmitry Tantsur <dtantsur@protonmail.com>
+Date:   Thu Jun 10 19:32:25 2021 +0200
+
+    Fix incorrect formatting and a Python 3.10 failure
+    
+    While testing on Python 3.10 two issues were spotted:
+    1) Missing formatting specifiers in registry logging
+    2) Reliance on the exact way HTTP status are converted to string
+    
+    Fedora bug https://bugzilla.redhat.com/show_bug.cgi?id=1969148
+    
+    Change-Id: I22d0033691ee0ba34fca14ac14904e33342a584a
+
+diff --git a/sushy/resources/registry/message_registry.py b/sushy/resources/registry/message_registry.py
+index f680c61..431a178 100644
+--- a/sushy/resources/registry/message_registry.py
++++ b/sushy/resources/registry/message_registry.py
+@@ -121,8 +121,8 @@ def parse_message(message_registries, message_field):
+ 
+     if not reg_msg:
+         LOG.warning(
+-            'Unable to find message for registry %(registry), '
+-            'message ID %(msg_key)', {
++            'Unable to find message for registry %(registry)s, '
++            'message ID %(msg_key)s', {
+                 'registry': registry,
+                 'msg_key': msg_key})
+         if message_field.message is None:
+diff --git a/sushy/tests/unit/test_connector.py b/sushy/tests/unit/test_connector.py
+index d0ebbbe..40d3164 100644
+--- a/sushy/tests/unit/test_connector.py
++++ b/sushy/tests/unit/test_connector.py
+@@ -387,8 +387,8 @@ class ConnectorOpTestCase(base.TestCase):
+             'HTTP GET of SessionService failed %s, '
+             'this is expected prior to authentication', 'HTTP GET '
+             'http://redfish/v1/SessionService returned code '
+-            'HTTPStatus.FORBIDDEN. unknown error Extended information: '
+-            'none')
++            '%s. unknown error Extended information: '
++            'none' % http_client.FORBIDDEN)
+         self.assertEqual(http_client.FORBIDDEN, exc.status_code)
+ 
+     def test_blocking_no_location_header(self):
