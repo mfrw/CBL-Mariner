@@ -1,0 +1,13 @@
+diff --git a/lib/blankslate.rb b/lib/blankslate.rb
+index 7ea1864..b974f40 100644
+--- a/lib/blankslate.rb
++++ b/lib/blankslate.rb
+@@ -129,7 +129,7 @@ class Module
+   alias blankslate_original_append_features append_features
+   def append_features(mod)
+     result = blankslate_original_append_features(mod)
+-    return result if mod != Object
++    return result if (mod != Object && mod != Kernel)
+     instance_methods.each do |name|
+       BlankSlate.hide(name)
+     end
