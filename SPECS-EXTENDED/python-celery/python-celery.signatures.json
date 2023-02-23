@@ -1,0 +1,6 @@
+{
+ "Signatures": {
+  "pytest.ini": "e47e8c2f61edccff453fb19eae2b455bf0577f501582ebe1403b5ebfc2d7d367",
+  "python-celery-5.2.6.tar.gz": "9e5d809a91a374c4b7d5a4305c53d5b2fb132c6dbde894a7c83c9f1ab721aa7e"
+ }
+}
