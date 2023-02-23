@@ -1,0 +1,13 @@
+diff --git a/Drivers/Speech/SpeechDispatcher/speech.c b/Drivers/Speech/SpeechDispatcher/speech.c
+index cc55007..a2fcc0d 100644
+--- a/Drivers/Speech/SpeechDispatcher/speech.c
++++ b/Drivers/Speech/SpeechDispatcher/speech.c
+@@ -35,7 +35,7 @@ typedef enum {
+ 
+ #include "spk_driver.h"
+ 
+-#include <libspeechd.h>
++#include <speech-dispatcher/libspeechd.h>
+ 
+ static SPDConnection *connectionHandle = NULL;
+ static const char *moduleName;
