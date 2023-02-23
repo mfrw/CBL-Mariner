@@ -1,0 +1,6 @@
+{
+ "Signatures": {
+  "igt-gpu-tools-20220508.tar.bz2": "6d362824e0879f3d10d722265e18efad9f1187e00065e4f21223ecfdc77af134",
+  "make-git-snapshot.sh": "e60f8b74a49e360dc7e63224bdfa2a5810e81d3f58c884012e6bbc7976ecc1a7"
+ }
+}
