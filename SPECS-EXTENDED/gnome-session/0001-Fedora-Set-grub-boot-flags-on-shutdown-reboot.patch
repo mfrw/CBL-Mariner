@@ -1,0 +1,49 @@
+From e3d6f1c1d342d0c74f2125ea0efa2a9669aaa8df Mon Sep 17 00:00:00 2001
+From: Hans de Goede <hdegoede@redhat.com>
+Date: Tue, 14 Aug 2018 14:49:59 +0200
+Subject: [PATCH] Fedora: Set grub boot-flags on shutdown / reboot
+
+Fedora's grub will automatically hide the boot-menu if the previous
+boot has set the boot_success flag in grub's environment. This happens
+automatically 30 seconds after login.
+
+But if the user shuts down or reboots from the system-menu before then
+(e.g. directly from gdm) then the boot_success flag gets not set. If
+a reboot / shutdown is initiated through gnome-session then the user
+is successfully interacting with the system, so set the boot_success
+flag from gnome_session for this case to fix reboot from gdm leading to
+the boot-menu not being hidden.
+---
+ gnome-session/gsm-manager.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/gnome-session/gsm-manager.c b/gnome-session/gsm-manager.c
+index 6839a02d..589efb02 100644
+--- a/gnome-session/gsm-manager.c
++++ b/gnome-session/gsm-manager.c
+@@ -3823,10 +3823,22 @@ do_query_end_session_exit (GsmManager *manager)
+                 break;
+         case GSM_MANAGER_LOGOUT_REBOOT:
+         case GSM_MANAGER_LOGOUT_REBOOT_INTERACT:
++                /*
++                 * Fedora specific patch to make sure the boot-menu does not
++                 * show when it is configured to auto-hide and a reboot is
++                 * initiated directly from gdm.
++                 */
++                system("/usr/sbin/grub2-set-bootflag boot_success");
+                 reboot = TRUE;
+                 break;
+         case GSM_MANAGER_LOGOUT_SHUTDOWN:
+         case GSM_MANAGER_LOGOUT_SHUTDOWN_INTERACT:
++                /*
++                 * Fedora specific patch to make sure the boot-menu does not
++                 * show when it is configured to auto-hide and a shutdown is
++                 * initiated directly from gdm.
++                 */
++                system("/usr/sbin/grub2-set-bootflag boot_success");
+                 shutdown = TRUE;
+                 break;
+         default:
+-- 
+2.28.0
+
