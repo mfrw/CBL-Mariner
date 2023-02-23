@@ -1,0 +1,66 @@
+From 3f62e9fbd3de11df52184ca8dfcabfb7d1c0fdeb Mon Sep 17 00:00:00 2001
+From: Robert Tiemann <rtie@gmx.de>
+Date: Fri, 17 May 2019 12:43:04 +0200
+Subject: [PATCH] Avoid possible crash when getting server properties.
+
+The crash occurs when calling dls_device_get_all_props() for a content
+directory server that we have not yet subscribed to (that is,
+prv_cds_subscribed() returns FALSE in
+prv_get_system_update_id_for_props()). This crash is caused by an
+invalid GVariantBuilder passed to g_variant_builder_end() in
+prv_get_sleeping_for_props(), leading to a NULL result pointer being
+passed to dls_async_task_complete(). A GVariant is attempted to be
+constructed from this NULL pointer in dls_task_complete().
+
+Here is the call chain that leads to the crash:
+
+    dls_device_get_all_props()
+    prv_get_system_update_id_for_props()
+    gupnp_service_proxy_begin_action("GetSystemUpdateID") -> prv_system_update_id_for_props_cb()
+    prv_system_update_id_for_props_cb()
+    prv_get_sr_token_for_props()
+    prv_get_sleeping_for_props()
+    dls_async_task_complete()
+    cb_data->cb() -> prv_async_task_complete()
+    prv_async_task_complete()
+    dls_task_complete()
+    g_variant_new()
+
+The crash was most likely observed when a device running Plex Media
+Server was present on the network.
+
+This commit moves the call of g_variant_builder_end() in
+prv_system_update_id_for_props_cb() (which invalidates the
+GVariantBuilder used later in prv_get_sleeping_for_props()) to the
+error handling branch. This leaves the GVariantBuilder alone and
+allows prv_get_sr_token_for_props() or one of its descendants to call
+g_variant_builder_end() and complete the task.
+---
+ libdleyna/server/device.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/libdleyna/server/device.c b/libdleyna/server/device.c
+index d77dfbc2725b..8777da0ea2db 100644
+--- a/libdleyna/server/device.c
++++ b/libdleyna/server/device.c
+@@ -2256,15 +2256,14 @@ static void prv_system_update_id_for_props_cb(GUPnPServiceProxy *proxy,
+ 			      DLS_SYSTEM_UPDATE_VAR,
+ 			      g_variant_new_uint32(id));
+ 
+-	cb_data->task.result = g_variant_ref_sink(g_variant_builder_end(
+-							cb_task_data->vb));
+-
+ on_complete:
+ 
+ 	if (!cb_data->error)
+ 		prv_get_sr_token_for_props(proxy, cb_data->task.target.device,
+ 					   cb_data);
+ 	else {
++		cb_data->task.result = g_variant_ref_sink(g_variant_builder_end(
++							cb_task_data->vb));
+ 		(void) g_idle_add(dls_async_task_complete, cb_data);
+ 		g_cancellable_disconnect(cb_data->cancellable,
+ 					 cb_data->cancel_id);
+-- 
+2.28.0
+
