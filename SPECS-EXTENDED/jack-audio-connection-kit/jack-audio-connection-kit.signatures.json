@@ -1,0 +1,8 @@
+{
+ "Signatures": {
+  "jack-audio-connection-kit-README.Fedora": "81770c501bd84381b767c2c8988cbd81ef0f71d77530a1b53e1003215ee4352c",
+  "jack-audio-connection-kit-limits.conf": "d5009eb955eba735709107d377001e3dbd994335d7170aaf7e0d4d21d94c9199",
+  "jack-audio-connection-kit-script.pa": "c5f895b9e9de805f775bef69d71c6beea1acce4aa7303a1e303285930a9c426c",
+  "jack2-1.9.20.tar.gz": "915ad2900992159bdb729b9fc4ea134b962ce32b2df0b384fee40a2c5808835d"
+ }
+}

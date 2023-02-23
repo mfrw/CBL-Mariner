@@ -1,0 +1,27 @@
+From f653c2d8e90a821538ae6fab68dccf4015c2d64f Mon Sep 17 00:00:00 2001
+From: Guido Aulisi <guido.aulisi@gmail.com>
+Date: Sun, 16 Jan 2022 21:24:18 +0100
+Subject: [PATCH] Fix build of jack-example-tools man pages
+
+Commit e8c0be1ce932bfb99fdd1a50e08fab187efed6ca changed the name
+of the configuration environment to build the jack-example-tools,
+but forgot to change it for man pages.
+---
+ man/wscript | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/man/wscript b/man/wscript
+index 52270c33..691b05ab 100644
+--- a/man/wscript
++++ b/man/wscript
+@@ -5,6 +5,6 @@
+ def build(bld):
+     bld.exec_command('cd man ; sh fill_template {} {}'.format(
+         bld.env['JACK_VERSION'],
+-        bld.env['HAVE_JACK_EXAMPLE_TOOLS'])
++        bld.env['BUILD_JACK_EXAMPLE_TOOLS'])
+     )
+     bld.install_files(bld.env['MANDIR'], bld.path.ant_glob('*.1'))
+-- 
+2.34.1
+
