@@ -1,0 +1,12 @@
+{
+ "Signatures": {
+  "bcmail-jdk15on-1.70.pom": "4cdb564feb9d1780d322a778c634a6a543a020779ee1c8fbb71e7e67ecb750d9",
+  "bcpg-jdk15on-1.70.pom": "df398b389bc419564df63c5ae2cf4b5ae653d96e5fbb253bbc94d1b06733cdf5",
+  "bcpkix-jdk15on-1.70.pom": "6ea5502b7eebec7018271bb8a82cb819bf4c1f2b6543549c5cfd84d6a13996bf",
+  "bcprov-jdk15on-1.70.pom": "6df4b5b76d9062017664ad0ca285e57154ae803607cb89c970b39cc0e016abb0",
+  "bctls-jdk15on-1.70.pom": "d2e7ec3f56f3dadc3f12922d7fbb8a86a39b090b284a8129ad17fbfd78f1827e",
+  "bcutil-jdk15on-1.70.pom": "9ebae71c25e0c9f2cd756003c01f1ad0fc398ca06fbcda0d175e71cac5840aad",
+  "get-poms.sh": "aed1d5339a4d9ce3150f4a4d38b411d46300092590c5fb0bc1e463c4b1f16f8d",
+  "r1rv70.tar.gz": "54ff39edf38ab988c4685fbbf0a9183a5fd94dee68bff36ae742f07a30acace8"
+ }
+}

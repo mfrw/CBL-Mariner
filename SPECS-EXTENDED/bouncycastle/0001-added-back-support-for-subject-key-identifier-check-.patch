@@ -1,0 +1,32 @@
+From d1fb007090813ce348a2d439f12fa347a8d5010c Mon Sep 17 00:00:00 2001
+From: David Hook <dgh@cryptoworkshop.com>
+Date: Wed, 12 Jan 2022 15:02:59 +1100
+Subject: [PATCH] added back support for subject key identifier check where
+ serial number is not provided.
+
+---
+ .../java/org/bouncycastle/x509/PKIXCertPathReviewer.java  | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/prov/src/main/java/org/bouncycastle/x509/PKIXCertPathReviewer.java b/prov/src/main/java/org/bouncycastle/x509/PKIXCertPathReviewer.java
+index 58a07d6c7..a78e97735 100644
+--- a/prov/src/main/java/org/bouncycastle/x509/PKIXCertPathReviewer.java
++++ b/prov/src/main/java/org/bouncycastle/x509/PKIXCertPathReviewer.java
+@@ -2492,6 +2492,14 @@ protected Collection getTrustAnchors(X509Certificate cert, Set trustanchors) thr
+                 {
+                     certSelectX509.setSerialNumber(authID.getAuthorityCertSerialNumber());
+                 }
++                else
++                {
++                    byte[] keyID = authID.getKeyIdentifier();
++                    if (keyID != null)
++                    {
++                        certSelectX509.setSubjectKeyIdentifier(new DEROctetString(keyID).getEncoded());
++                    }
++                }
+             }
+         }
+         catch (IOException ex)
+-- 
+2.34.1
+
