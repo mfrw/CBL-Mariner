@@ -1,0 +1,289 @@
+--- src/AES.c
++++ src/AES.c
+@@ -26,6 +26,7 @@
+ 
+ #include <assert.h>
+ #include <stdlib.h>
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ 
+ #define MODULE_NAME _AES
+--- src/ARC2.c
++++ src/ARC2.c
+@@ -42,6 +42,7 @@
+  */
+ 
+ #include <string.h>  
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ 
+ #define MODULE_NAME _ARC2
+--- src/block_template.c
++++ src/block_template.c
+@@ -33,6 +33,7 @@
+ #include <string.h>
+ #endif
+ 
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ #include "pycrypto_compat.h"
+ #include "modsupport.h" 
+@@ -123,7 +124,8 @@ ALGnew(PyObject *self, PyObject *args, P
+ {
+ 	unsigned char *key, *IV;
+ 	ALGobject * new=NULL;
+-	int keylen, IVlen=0, mode=MODE_ECB, segment_size=0;
++	Py_ssize_t keylen, IVlen=0;
++	int mode=MODE_ECB, segment_size=0;
+ 	PyObject *counter = NULL;
+ 	int counter_shortcut = 0;
+ #ifdef PCT_ARC2_MODULE
+@@ -161,7 +163,7 @@ ALGnew(PyObject *self, PyObject *args, P
+ 	{
+ 		PyErr_Format(PyExc_ValueError,
+ 			     "Key must be %i bytes long, not %i",
+-			     KEY_SIZE, keylen);
++			     KEY_SIZE, (int)keylen);
+ 		return NULL;
+ 	}
+ 	if (KEY_SIZE==0 && keylen==0)
+@@ -242,7 +244,7 @@ ALGnew(PyObject *self, PyObject *args, P
+         new->st.effective_keylen = effective_keylen;
+ #endif
+ 
+-	block_init(&(new->st), key, keylen);
++	block_init(&(new->st), key, (int)keylen);
+ 	if (PyErr_Occurred())
+ 	{
+ 		Py_DECREF(new);
+@@ -250,7 +252,7 @@ ALGnew(PyObject *self, PyObject *args, P
+ 	}
+ 	memset(new->IV, 0, BLOCK_SIZE);
+ 	memset(new->oldCipher, 0, BLOCK_SIZE);
+-	memcpy(new->IV, IV, IVlen);
++	memcpy(new->IV, IV, (size_t)IVlen);
+ 	new->mode = mode;
+ 	new->count=BLOCK_SIZE;   /* stores how many bytes in new->oldCipher have been used */
+ 	return new;
+@@ -264,7 +266,8 @@ ALG_Encrypt(ALGobject *self, PyObject *a
+ {
+ 	unsigned char *buffer, *str;
+ 	unsigned char temp[BLOCK_SIZE];
+-	int i, j, len;
++	int i, j;
++	Py_ssize_t len;
+ 	PyObject *result;
+   
+ 	if (!PyArg_Parse(args, "s#", &str, &len))
+@@ -292,7 +295,7 @@ ALG_Encrypt(ALGobject *self, PyObject *a
+ 		return NULL;
+ 	}
+ 
+-	buffer=malloc(len);
++	buffer=malloc((size_t)len);
+ 	if (buffer==NULL) 
+ 	{
+ 		PyErr_SetString(PyExc_MemoryError, 
+@@ -496,7 +499,8 @@ ALG_Decrypt(ALGobject *self, PyObject *a
+ {
+ 	unsigned char *buffer, *str;
+ 	unsigned char temp[BLOCK_SIZE];
+-	int i, j, len;
++	int i, j;
++	Py_ssize_t len;
+ 	PyObject *result;
+ 
+ 	/* CTR mode decryption is identical to encryption */
+@@ -525,7 +529,7 @@ ALG_Decrypt(ALGobject *self, PyObject *a
+ 			     self->segment_size/8);
+ 		return NULL;
+ 	}
+-	buffer=malloc(len);
++	buffer=malloc((size_t)len);
+ 	if (buffer==NULL) 
+ 	{
+ 		PyErr_SetString(PyExc_MemoryError, 
+--- src/Blowfish.c
++++ src/Blowfish.c
+@@ -36,6 +36,7 @@
+ #endif
+ #include <assert.h>
+ #include <string.h>
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ 
+ #include "Blowfish-tables.h"
+--- src/CAST.c
++++ src/CAST.c
+@@ -42,6 +42,7 @@
+ 
+ */
+ 
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ 
+ #define MODULE_NAME _CAST
+--- src/DES.c
++++ src/DES.c
+@@ -34,6 +34,7 @@
+ #undef DES  /* this is needed because tomcrypt_custom.h defines DES to an empty string */
+ 
+ #include <assert.h>
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ 
+ typedef struct {
+--- src/hash_template.c
++++ src/hash_template.c
+@@ -30,6 +30,7 @@
+ #ifdef _HAVE_STDC_HEADERS
+ #include <string.h>
+ #endif
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ #include "pycrypto_compat.h"
+ 
+@@ -163,7 +164,7 @@ static PyObject *
+ ALG_update(ALGobject *self, PyObject *args)
+ {
+ 	unsigned char *cp;
+-	int len;
++	Py_ssize_t len;
+ 
+ 	if (!PyArg_ParseTuple(args, "s#", &cp, &len))
+ 		return NULL;
+@@ -273,7 +274,7 @@ ALG_new(PyObject *self, PyObject *args)
+ {
+         ALGobject *new;
+ 	unsigned char *cp = NULL;
+-	int len;
++	Py_ssize_t len;
+ 	
+ 	if ((new = newALGobject()) == NULL)
+ 		return NULL;
+--- src/MD2.c
++++ src/MD2.c
+@@ -28,6 +28,7 @@
+   
+ 
+ #include <string.h>
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ #include "pycrypto_compat.h"
+ 
+--- src/MD4.c
++++ src/MD4.c
+@@ -28,6 +28,7 @@
+   
+ 
+ #include <string.h>
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ #include "pycrypto_compat.h"
+ 
+--- src/RIPEMD160.c
++++ src/RIPEMD160.c
+@@ -54,6 +54,7 @@
+ 
+ #include <assert.h>
+ #include <string.h>
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ #include "pycrypto_compat.h"
+ 
+--- src/stream_template.c
++++ src/stream_template.c
+@@ -33,6 +33,7 @@
+ #include <string.h>
+ #endif
+ 
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ #include "pycrypto_compat.h"
+ #include "modsupport.h"
+@@ -100,7 +101,7 @@ ALGnew(PyObject *self, PyObject *args, P
+ {
+ 	unsigned char *key;
+ 	ALGobject * new;
+-	int keylen;
++	Py_ssize_t keylen;
+ 
+ 	new = newALGobject();
+ 	if (!PyArg_ParseTupleAndKeywords(args, kwdict, "s#", kwlist, 
+@@ -124,7 +125,7 @@ ALGnew(PyObject *self, PyObject *args, P
+ 				"the null string (0 bytes long)");
+ 		return NULL;
+ 	}
+-	stream_init(&(new->st), key, keylen);
++	stream_init(&(new->st), key, (int)keylen);
+ 	if (PyErr_Occurred())
+ 	{
+ 		Py_DECREF(new);
+@@ -140,7 +141,7 @@ static PyObject *
+ ALG_Encrypt(ALGobject *self, PyObject *args)
+ {
+ 	unsigned char *buffer, *str;
+-	int len;
++	Py_ssize_t len;
+ 	PyObject *result;
+ 
+ 	if (!PyArg_Parse(args, "s#", &str, &len))
+@@ -149,7 +150,7 @@ ALG_Encrypt(ALGobject *self, PyObject *a
+ 	{
+ 		return PyBytes_FromStringAndSize(NULL, 0);
+ 	}
+-	buffer = malloc(len);
++	buffer = malloc((size_t)len);
+ 	if (buffer == NULL)
+ 	{
+ 		PyErr_SetString(PyExc_MemoryError, "No memory available in "
+@@ -157,8 +158,8 @@ ALG_Encrypt(ALGobject *self, PyObject *a
+ 		return NULL;
+ 	}
+ 	Py_BEGIN_ALLOW_THREADS;
+-	memcpy(buffer, str, len);
+-	stream_encrypt(&(self->st), buffer, len);
++	memcpy(buffer, str, (size_t)len);
++	stream_encrypt(&(self->st), buffer, (int)len);
+ 	Py_END_ALLOW_THREADS;
+ 	result = PyBytes_FromStringAndSize((char *)buffer, len);
+ 	free(buffer);
+@@ -172,7 +173,7 @@ static PyObject *
+ ALG_Decrypt(ALGobject *self, PyObject *args)
+ {
+ 	unsigned char *buffer, *str;
+-	int len;
++	Py_ssize_t len;
+ 	PyObject *result;
+ 
+ 	if (!PyArg_Parse(args, "s#", &str, &len))
+@@ -181,7 +182,7 @@ ALG_Decrypt(ALGobject *self, PyObject *a
+ 	{
+ 		return PyBytes_FromStringAndSize(NULL, 0);
+ 	}
+-	buffer = malloc(len);
++	buffer = malloc((size_t)len);
+ 	if (buffer == NULL)
+ 	{
+ 		PyErr_SetString(PyExc_MemoryError, "No memory available in "
+@@ -189,8 +190,8 @@ ALG_Decrypt(ALGobject *self, PyObject *a
+ 		return NULL;
+ 	}
+ 	Py_BEGIN_ALLOW_THREADS;
+-	memcpy(buffer, str, len);
+-	stream_decrypt(&(self->st), buffer, len);
++	memcpy(buffer, str, (size_t)len);
++	stream_decrypt(&(self->st), buffer, (int)len);
+ 	Py_END_ALLOW_THREADS;
+ 	result = PyBytes_FromStringAndSize((char *)buffer, len);
+ 	free(buffer);
+--- src/XOR.c
++++ src/XOR.c
+@@ -24,6 +24,7 @@
+  * =======================================================================
+  */
+ 
++#define PY_SSIZE_T_CLEAN
+ #include "Python.h"
+ 
+ #define MODULE_NAME _XOR
