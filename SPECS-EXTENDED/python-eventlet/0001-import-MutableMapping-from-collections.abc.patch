@@ -1,0 +1,31 @@
+From e88a14f86390b22ee55a810d0cd1b68c32c54423 Mon Sep 17 00:00:00 2001
+From: Tomas Hrnciar <thrnciar@redhat.com>
+Date: Wed, 16 Jun 2021 13:29:20 +0200
+Subject: [PATCH] import MutableMapping from collections.abc
+
+---
+ dns/namedict.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/dnspython-1.16.0/dns/namedict.py b/dnspython-1.16.0/dns/namedict.py
+index 37a1310..ae8d6a4 100644
+--- a/dns/namedict.py
++++ b/dns/namedict.py
+@@ -27,12 +27,12 @@
+ 
+ """DNS name dictionary"""
+ 
+-import collections
++from collections.abc import MutableMapping
+ import dns.name
+ from ._compat import xrange
+ 
+ 
+-class NameDict(collections.MutableMapping):
++class NameDict(MutableMapping):
+     """A dictionary whose keys are dns.name.Name objects.
+ 
+     In addition to being like a regular Python dictionary, this
+-- 
+2.31.1
+
