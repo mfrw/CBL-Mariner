@@ -1,0 +1,7 @@
+{
+ "Signatures": {
+  "cpl-v10.html": "dde4c2b665c81a60a6dec39beb54b89836ae071e552d935a04880f9d5a2e58cd",
+  "generate-tarball.sh": "b223db29e37a7bfd28678bc01b63131e28158e97568ca8d3a4d870256d0bddcf",
+  "maven-surefire-3.0.0~M4.tar.gz": "4b4e13f8c64652a763d592dfdde17e07d1921bf1d70f5fa17b5c5c83dd298f27"
+ }
+}
