@@ -1,0 +1,12 @@
+{
+ "Signatures": {
+  "adobe-flash.xml": "cd9cbdb5ccee6f932d8c78dcfa1eeb6c05355bc38fe6862260e97adab82f42d3",
+  "fedora-36-icons.tar.gz": "4d8bd767432bebb6dcb698aefb8674d1175f7e500e7ae5223d7a47122328e862",
+  "fedora-36.xml.gz": "367a6e4437fa5be6f8cf80765d3f2db5f24c72f823cfaec0f9e3f392cec8e5e0",
+  "fedora-categories.xml": "ff3997d8bf25d91ab305af50ab572812500aa5021554c51ec84e0535fc79451c",
+  "fedora-popular.xml": "94a98b422d011da90110293de0f52ea838cd328899c4797012afb30e705ea9fa",
+  "google-chrome.xml": "64897c9186ec4ab897fd2d1ee33d4c4be6dcf6722fb9351b9d31c92d122d12e6",
+  "gstreamer-non-free.xml": "1a720809a093dd94efb5f3ab2e577c08db6821eeb20011819bab1b6ffe8ddff7",
+  "other-repos.xml": "6f8b990fabd295e1dc0a770d7e95c3f13d132d9255bbab7d177c1150c32c6591"
+ }
+}
