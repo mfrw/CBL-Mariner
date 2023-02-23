@@ -1,0 +1,37 @@
+From b4fe5240180fef12bbd168686b3ac0ce3240acf8 Mon Sep 17 00:00:00 2001
+From: Chris Kelley <ckelley@redhat.com>
+Date: Mon, 6 Dec 2021 12:11:57 +0000
+Subject: [PATCH] Change compilation source/target to Java 11
+
+---
+ pom.xml | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/pom.xml b/pom.xml
+index 13d68726..17463201 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -36,12 +36,15 @@
+   <properties>
+     <!-- 04-Mar-2019, tatu: Retain Java6/JDK1.6 compatibility for annotations for Jackson 2.x,
+              but use Moditect to get JDK9+ module info support; need newer bundle plugin as well
+-      -->
+-    <javac.src.version>1.6</javac.src.version>
+-    <javac.target.version>1.6</javac.target.version>
++    -->
++    <!-- 06-Dec-2021, ckelley: Java 6 compilation is no longer supported in Fedora 36+, we must drop
++	    the Java 1.6 compatibility in order to use Java 17. Use Java 11 for now, then switch to
++	    Java 17 after default JDK is switched to Java 17.
++    -->
++    <javac.src.version>11</javac.src.version>
++    <javac.target.version>11</javac.target.version>
+ 
+-    <maven.compiler.source>1.6</maven.compiler.source>
+-    <maven.compiler.target>1.6</maven.compiler.target>
++    <maven.compiler.release>11</maven.compiler.release>
+ 
+     <osgi.export>com.fasterxml.jackson.core;version=${project.version},
+ com.fasterxml.jackson.core.*;version=${project.version}
+-- 
+2.33.1
+
