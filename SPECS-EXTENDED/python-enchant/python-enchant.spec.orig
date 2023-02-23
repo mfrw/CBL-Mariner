@@ -1,29 +1,36 @@
+Vendor:         Microsoft Corporation
+Distribution:   Mariner
 # Work around a problem with libenchant versioning
 # (python-enchant-1.3.1 failed to work with enchant-1.4.2-2.fc10)
 %global enchant_dep enchant >= 1.5.0
 %global srcname enchant
-Summary:        Python bindings for Enchant spellchecking library
+
 Name:           python-enchant
 Version:        3.2.2
 Release:        3%{?dist}
+Summary:        Python bindings for Enchant spellchecking library
+
 License:        LGPLv2+
-Vendor:         Microsoft Corporation
-Distribution:   Mariner
 URL:            http://packages.python.org/pyenchant/
 Source0:        https://files.pythonhosted.org/packages/source/p/py%{srcname}/py%{srcname}-%{version}.tar.gz
-BuildRequires:  enchant-devel
+
 BuildArch:      noarch
+BuildRequires:  enchant-devel
 
 %description
 PyEnchant is a spellchecking library for Python, based on the Enchant
 library by Dom Lachowicz.
 
+
 %package -n python3-%{srcname}
-%{?python_provide:%python_provide python3-%{srcname}}
 Summary:        Python 3 bindings for Enchant spellchecking library
+
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
+
 Requires:       %{enchant_dep}
+
+%{?python_provide:%python_provide python3-%{srcname}}
 
 %description -n python3-%{srcname}
 PyEnchant is a spellchecking library for Python 3, based on the Enchant
@@ -34,7 +41,7 @@ library by Dom Lachowicz.
 # Remove bundled egg-info
 rm -rf py%{srcname}.egg-info
 
-find . -name '*.py' | xargs sed -i '1s|^#!python|#!python3|'
+find . -name '*.py' | xargs sed -i '1s|^#!python|#!%{__python3}|'
 
 %build
 %py3_build
@@ -43,8 +50,8 @@ find . -name '*.py' | xargs sed -i '1s|^#!python|#!python3|'
 %py3_install
 
 # Directories used in windows build
-rm -rf %{buildroot}/%{python3_sitelib}/%{srcname}/lib
-rm -rf %{buildroot}/%{python3_sitelib}/%{srcname}/share
+rm -rf $RPM_BUILD_ROOT/%{python3_sitelib}/%{srcname}/lib
+rm -rf $RPM_BUILD_ROOT/%{python3_sitelib}/%{srcname}/share
 
 
 # Tests are not included in the upstream tarball
@@ -68,8 +75,9 @@ rm -rf %{buildroot}/%{python3_sitelib}/%{srcname}/share
 %{python3_sitelib}/%{srcname}/tokenize/__pycache__/*.py[co]
 %{python3_sitelib}/py%{srcname}-%{version}-py%{python3_version}.egg-info
 
+
 %changelog
-* Tue Jan 03 2023 Suresh Thelkar <sthelkar@microsoft.com> - 3.2.2-3
+* Mon Jan 03 2023 Suresh Thelkar <sthelkar@microsoft.com> - 3.2.2-3
 - Initial CBL-Mariner import from Fedora 36 (license: MIT)
 - License verified
 
