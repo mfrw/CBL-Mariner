@@ -1,0 +1,8 @@
+{
+ "Signatures": {
+  "KEYS": "c4bb9a81a4330dfed089afb72975fdc1d71f77760db64b03317121d831157987",
+  "apache-ivy-2.5.0-src.tar.gz": "109583a8d10b5d9a71c57c539719ca3648ebb8ca4af867976128e7fa657312b7",
+  "apache-ivy-2.5.0-src.tar.gz.asc": "8fc69805b7fdae96a6957006575c1d17c3ddb57bb08c179a74ba6952e0937df3",
+  "ivy-2.5.0.pom": "516106ddc6a4fc14445e5ea309710faba423d4591ed7667fff5f8c074ace2f18"
+ }
+}
