@@ -1,0 +1,76 @@
+From 65b5de2ef9ffc5eacb23c6c4834cc1c513f0eafa Mon Sep 17 00:00:00 2001
+From: Mat Booth <mat.booth@redhat.com>
+Date: Wed, 19 Aug 2020 13:14:37 +0100
+Subject: [PATCH 2/2] Port to servlet-api 4/5
+
+---
+ .../jetty/server/handler/ContextHandler.java  | 46 +++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+
+diff --git a/jetty-server/src/main/java/org/eclipse/jetty/server/handler/ContextHandler.java b/jetty-server/src/main/java/org/eclipse/jetty/server/handler/ContextHandler.java
+index 7960b0f..4981755 100644
+--- a/jetty-server/src/main/java/org/eclipse/jetty/server/handler/ContextHandler.java
++++ b/jetty-server/src/main/java/org/eclipse/jetty/server/handler/ContextHandler.java
+@@ -2760,6 +2760,13 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
+             return null;
+         }
+ 
++        public ServletRegistration.Dynamic addJspFile(String servletName, String jspFile)
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "addJspFile(String, String)");
++            return null;
++        }
++
+         @Override
+         public javax.servlet.ServletRegistration.Dynamic addServlet(String servletName, Class<? extends Servlet> servletClass)
+         {
+@@ -2930,6 +2937,45 @@ public class ContextHandler extends ScopedHandler implements Attributes, Gracefu
+         {
+             return null;
+         }
++
++        public int getSessionTimeout()
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "getSessionTimeout()");
++            return 0;
++        }
++
++        public void setSessionTimeout(int sessionTimeout)
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "setSessionTimeout(int)");
++        }
++
++        public String getRequestCharacterEncoding()
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "getRequestCharacterEncoding()");
++            return null;
++        }
++
++        public void setRequestCharacterEncoding(String encoding)
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "setRequestCharacterEncoding(String)");
++        }
++
++        public String getResponseCharacterEncoding()
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "getResponseCharacterEncoding()");
++            return null;
++        }
++
++        public void setResponseCharacterEncoding(String encoding)
++        {
++            // TODO new in 4.0
++            LOG.warn(UNIMPLEMENTED_USE_SERVLET_CONTEXT_HANDLER, "setResponseCharacterEncoding(String)");
++        }
+     }
+ 
+     /**
+-- 
+2.26.2
+
