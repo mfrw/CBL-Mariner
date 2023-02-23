@@ -1,0 +1,32 @@
+From 9815fd1e2ab13f765b75b39e3764fe1e860cb251 Mon Sep 17 00:00:00 2001
+From: Adam Williamson <awilliam@redhat.com>
+Date: Thu, 10 Sep 2020 10:35:11 -0700
+Subject: [PATCH] examples: only check opencv_dep if option is not disabled
+ (#1406)
+
+We can't check opencv_dep if the option is disabled because it's
+never initialized in that case, since 833a65cc .
+
+Signed-off-by: Adam Williamson <awilliam@redhat.com>
+---
+ tests/examples/meson.build | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/tests/examples/meson.build b/tests/examples/meson.build
+index 2eba1d47e..a41fc1679 100644
+--- a/tests/examples/meson.build
++++ b/tests/examples/meson.build
+@@ -9,7 +9,9 @@ subdir('mpegts')
+ subdir('msdk')
+ subdir('mxf')
+ subdir('nvcodec')
+-subdir('opencv', if_found: opencv_dep)
++if not get_option('opencv').disabled()
++    subdir('opencv', if_found: opencv_dep)
++endif
+ subdir('uvch264')
+ subdir('va')
+ subdir('waylandsink')
+-- 
+2.28.0
+
