@@ -1,0 +1,67 @@
+diff --git a/build.xml b/build.xml
+index 9c8ab7d..040318c 100644
+--- a/build.xml
++++ b/build.xml
+@@ -97,7 +97,7 @@ com.mysql.cj.extra.libs=&lt;full_path_to_connector-j-jardeps&gt;
+ # - Must point to JDK home directory.
+ # - Also used for testing if 'com.mysql.cj.testsuite.jvm' is not provided.
+ # - Mandatory.
+-com.mysql.cj.build.jdk=&lt;full_path_to_jdk1.8&gt;
++com.mysql.cj.build.jdk=&lt;full_path_to_jdk11&gt;
+ 
+ # Single JVM/MySQL tests:
+ # - Must point to JDK or JRE home directory.
+@@ -259,7 +259,7 @@ See also com.mysql.cj.conf.PropertyDefinitions.SYSP_* variables for other test o
+     </condition>
+ 
+     <!-- The JDK used to compile the code. -->
+-    <property name="com.mysql.cj.build.jdk" value="/usr/lib/jvm/jdk1.8" />
++    <property name="com.mysql.cj.build.jdk" value="/usr/lib/jvm/jdk11" />
+ 
+     <!-- Generate debugging info in compiled code. -->
+     <property name="com.mysql.cj.build.addDebugInfo" value="yes" />
+@@ -352,12 +352,12 @@ See also com.mysql.cj.conf.PropertyDefinitions.SYSP_* variables for other test o
+             <arg value="-version" />
+         </exec>
+ 
+-        <fail message="Java 8 is required. Set the full path to this JDK home with the property 'com.mysql.cj.build.jdk'. Default: '/usr/lib/jvm/jdk1.8').">
++        <fail message="Java 11 is required. Set the full path to this JDK home with the property 'com.mysql.cj.build.jdk'. Default: '/usr/lib/jvm/jdk11').">
+             <condition>
+                 <not>
+                     <and>
+                         <equals arg1="${com.mysql.cj.build.jdk.exitStatus}" arg2="0" />
+-                        <contains string="${com.mysql.cj.build.jdk.version}" substring="version &quot;1.8" casesensitive="true" />
++                        <contains string="${com.mysql.cj.build.jdk.version}" substring="version &quot;11" casesensitive="true" />
+                     </and>
+                 </not>
+             </condition>
+@@ -385,7 +385,7 @@ See also com.mysql.cj.conf.PropertyDefinitions.SYSP_* variables for other test o
+             <arg value="-version" />
+         </exec>
+ 
+-        <fail message="Testing Connector/J requires a JVM 1.8 or higher. Set the path to this JVM (JRE or JDK) home with the property 'com.mysql.cj.testsuite.jvm'. Default: '${com.mysql.cj.build.jdk}'.">
++        <fail message="Testing Connector/J requires a JVM 11 or higher. Set the path to this JVM (JRE or JDK) home with the property 'com.mysql.cj.testsuite.jvm'. Default: '${com.mysql.cj.build.jdk}'.">
+             <condition>
+                 <not>
+                     <equals arg1="${com.mysql.cj.testsuite.jvm.exitStatus}" arg2="0" />
+diff --git a/src/build/misc/rpm.spec.in b/src/build/misc/rpm.spec.in
+index d2926bb..9cf507b 100644
+--- a/src/build/misc/rpm.spec.in
++++ b/src/build/misc/rpm.spec.in
+@@ -84,13 +84,13 @@ BuildRequires:  ant
+ %endif
+ 
+ %if 0%{!?with_java:1}
+-BuildRequires:  java-devel >= 1:1.8.0
++BuildRequires:  java-devel >= 1:11
+ %endif
+ 
+ %if 0%{?sles12:1} || 0%{?sles15:1}
+-Requires:       java-headless >= 1.8.0
++Requires:       java-headless >= 11
+ %else
+-Requires:       java-headless >= 1:1.8.0
++Requires:       java-headless >= 1:11
+ %endif
+ 
+ %description

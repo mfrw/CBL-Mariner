@@ -1,0 +1,87 @@
+From b9a7a929f547d1408c42aca31603d52518f6296b Mon Sep 17 00:00:00 2001
+From: Zuzana Miklankova <zmiklank@redhat.com>
+Date: Tue, 18 Jan 2022 15:04:09 +0100
+Subject: [PATCH] patch
+
+---
+ .../regression/StatementRegressionTest.java   | 50 -------------------
+ 1 file changed, 50 deletions(-)
+
+diff --git a/src/test/java/testsuite/regression/StatementRegressionTest.java b/src/test/java/testsuite/regression/StatementRegressionTest.java
+index b5c53e9a..89483a07 100644
+--- a/src/test/java/testsuite/regression/StatementRegressionTest.java
++++ b/src/test/java/testsuite/regression/StatementRegressionTest.java
+@@ -154,7 +154,6 @@ import com.mysql.cj.util.TimeUtil;
+ import testsuite.BaseQueryInterceptor;
+ import testsuite.BaseTestCase;
+ import testsuite.UnreliableSocketFactory;
+-import testsuite.simple.StatementsTest;
+ 
+ /**
+  * Regression tests for the Statement class
+@@ -11602,20 +11601,6 @@ public class StatementRegressionTest extends BaseTestCase {
+         }
+     }
+ 
+-    /**
+-     * Tests fix for Bug#23204652, CURSOR POSITIONING API'S DOESNOT CHECK THE VALIDITY OF RESULTSET.
+-     * 
+-     * @throws Exception
+-     * 
+-     * @see StatementsTest#testResultSetProducingQueries()
+-     */
+-    @Test
+-    public void testBug23204652() throws Exception {
+-        assertThrows(SQLException.class, "Statement\\.executeQuery\\(\\) cannot issue statements that do not produce result sets\\.", () -> {
+-            this.stmt.executeQuery("DO 1 + 2");
+-            return null;
+-        });
+-    }
+ 
+     /**
+      * Tests fix for Bug#71929 (18346501), Prefixing query with double comments cancels query DML validation.
+@@ -11643,41 +11628,6 @@ public class StatementRegressionTest extends BaseTestCase {
+         }
+     }
+ 
+-    /**
+-     * Test fix for Bug#103612 (32902019), Incorrectly identified WITH...SELECT as unsafe for read-only connections.
+-     * 
+-     * @throws Exception
+-     * 
+-     * @see StatementsTest#testReadOnlySafeStatements()
+-     */
+-    @Test
+-    public void testBug103612() throws Exception {
+-        assumeTrue(versionMeetsMinimum(8, 0, 1), "MySQL 8.0.1+ is required to run this test.");
+-
+-        createTable("testBug103612", "(id INT)");
+-        String query = "WITH cte AS (SELECT * FROM testBug103612) SELECT * FROM cte";
+-
+-        boolean useSPS = false;
+-        boolean readOnly = false;
+-        do {
+-            final String testCase = String.format("Case [SPS: %s, ReadOnly: %s]", useSPS ? "Y" : "N", readOnly ? "Y" : "N");
+-
+-            Properties props = new Properties();
+-            props.setProperty(PropertyKey.useServerPrepStmts.getKeyName(), Boolean.toString(useSPS));
+-            Connection testConn = getConnectionWithProps(props);
+-            testConn.setReadOnly(readOnly);
+-
+-            try (Statement testStmt = testConn.createStatement()) {
+-                assertTrue(testStmt.execute(query), testCase);
+-            }
+-            try (PreparedStatement testPstmt = testConn.prepareStatement(query)) {
+-                assertTrue(testPstmt.execute(), testCase);
+-            }
+-
+-            testConn.close();
+-        } while ((useSPS = !useSPS) || (readOnly = !readOnly));
+-    }
+-
+     /**
+      * Tests fix for Bug#101389 (32089018), GETWARNINGS SHOULD CHECK WARNING COUNT BEFORE SENDING SHOW.
+      * 
+-- 
+2.34.1
+
