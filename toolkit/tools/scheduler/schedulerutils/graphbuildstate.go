@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/pkggraph"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkggraph"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/sliceutils"
 )
 
