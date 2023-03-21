@@ -11,7 +11,7 @@ import (
 
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/file"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/shell"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/shell"
 )
 
 // CreateRepo will create an RPM repository at repoDir
