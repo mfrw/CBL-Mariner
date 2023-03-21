@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/exe"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/logger"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/pkggraph"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/pkgjson"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/shell"

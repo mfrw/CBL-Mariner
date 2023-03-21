@@ -19,7 +19,7 @@ import (
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/diskutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/file"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/jsonutils"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/logger"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/pkgjson"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/randomization"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/retry"

@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/buildpipeline"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/logger"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/packagerepo/repocloner"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/packagerepo/repomanager/rpmrepomanager"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/pkgjson"

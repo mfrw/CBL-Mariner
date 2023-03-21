@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/logger"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/retry"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/shell"
 )

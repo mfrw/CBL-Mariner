@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/jsonutils"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/logger"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/versioncompare"
 )
 
