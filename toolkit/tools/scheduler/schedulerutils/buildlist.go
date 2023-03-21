@@ -7,8 +7,8 @@ import (
 	"bufio"
 	"os"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/configuration"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/installutils"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/configuration"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/installutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkggraph"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkgjson"

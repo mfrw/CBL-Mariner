@@ -15,8 +15,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/configuration"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/diskutils"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/configuration"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/diskutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/file"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/jsonutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"

@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/diskutils"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/diskutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 )
 

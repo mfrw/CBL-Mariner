@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/configuration"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/installutils"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/configuration"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/installutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/jsonutils"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 

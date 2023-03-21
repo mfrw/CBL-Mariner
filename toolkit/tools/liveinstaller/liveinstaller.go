@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/attendedinstaller"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/imagegen/configuration"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/attendedinstaller"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/imagegen/configuration"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/exe"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/file"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/jsonutils"
