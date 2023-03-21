@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/exe"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/exe"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/file"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/safechroot"
