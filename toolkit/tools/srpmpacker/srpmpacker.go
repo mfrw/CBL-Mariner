@@ -27,7 +27,7 @@ import (
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/network"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/retry"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/rpm"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/internal/safechroot"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/safechroot"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 )
