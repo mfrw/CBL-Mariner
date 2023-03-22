@@ -16,8 +16,8 @@ import (
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkggraph"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkgjson"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/shell"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/scheduler/buildagents"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/scheduler/schedulerutils"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/scheduler/buildagents"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/scheduler/schedulerutils"
 
 	"github.com/juliangruber/go-intersect"
 	"golang.org/x/sys/unix"

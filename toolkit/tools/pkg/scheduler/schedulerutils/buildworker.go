@@ -17,7 +17,7 @@ import (
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkggraph"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/retry"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/sliceutils"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/scheduler/buildagents"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/scheduler/buildagents"
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/traverse"
 )

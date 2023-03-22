@@ -13,7 +13,7 @@ import (
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/file"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/logger"
 	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/pkggraph"
-	"github.com/microsoft/CBL-Mariner/toolkit/tools/scheduler/schedulerutils"
+	"github.com/microsoft/CBL-Mariner/toolkit/tools/pkg/scheduler/schedulerutils"
 
 	"gonum.org/v1/gonum/graph"
 	"gopkg.in/alecthomas/kingpin.v2"
